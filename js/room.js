@@ -2,7 +2,7 @@
 // opening and a door opening), baseboards, framed pictures and the exterior
 // view seen through the window.
 import * as THREE from 'three';
-import { makeWoodTexture, makeWallTexture, makePictureTexture } from './textures.js';
+import { makeWoodTexture, makeWallTexture, makePictureTexture, makeFabricTexture, makeClockTexture } from './textures.js';
 
 export const ROOM = { w: 10, d: 8, h: 3.2, wall: 0.15 };
 
@@ -28,7 +28,9 @@ export function buildRoom(scene) {
   // ---- Floor -------------------------------------------------------------
   const woodTex = makeWoodTexture({ base: WOOD_THEMES.oak });
   woodTex.repeat.set(4, 3.2);
-  const floorMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.7, metalness: 0.05 });
+  const floorMat = new THREE.MeshStandardMaterial({
+    map: woodTex, bumpMap: woodTex, bumpScale: 0.015, roughness: 0.65, metalness: 0.05,
+  });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
@@ -85,6 +87,10 @@ export function buildRoom(scene) {
 
   // ---- Exterior seen through the window ---------------------------------
   group.add(buildExterior());
+
+  // ---- Soft furnishings & details ---------------------------------------
+  group.add(buildCurtains(win));
+  group.add(buildClock());
 
   // ---- API ---------------------------------------------------------------
   function setWallColor(hex) {
@@ -289,5 +295,49 @@ function buildExterior() {
   );
   bldg.position.set(20, 4.5, -6);
   g.add(bldg);
+  return g;
+}
+
+// Cloth curtain panels + rod flanking the window on the right wall.
+function buildCurtains(win) {
+  const g = new THREE.Group();
+  const x = ROOM.w / 2 - 0.1;
+  const cy = ROOM.h / 2 + win.y;           // window centre height (world)
+  const topY = cy + win.h / 2;
+  const col = '#cdd6cf';
+  const mat = new THREE.MeshStandardMaterial({
+    color: col, map: makeFabricTexture(col), roughness: 0.95, side: THREE.DoubleSide,
+  });
+  const h = topY + 0.04;
+  for (const sz of [-1, 1]) {
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.04, h, 0.36), mat);
+    panel.position.set(x, h / 2 + 0.02, sz * (win.w / 2 + 0.2));
+    panel.castShadow = true;
+    panel.receiveShadow = true;
+    g.add(panel);
+  }
+  const rod = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, win.w + 0.9, 12),
+    new THREE.MeshStandardMaterial({ color: '#6b6b6b', metalness: 0.7, roughness: 0.3 })
+  );
+  rod.rotation.x = Math.PI / 2;
+  rod.position.set(x, topY + 0.12, win.x);
+  g.add(rod);
+  return g;
+}
+
+// Analog wall clock on the back wall.
+function buildClock() {
+  const g = new THREE.Group();
+  const face = new THREE.Mesh(
+    new THREE.CircleGeometry(0.3, 48),
+    new THREE.MeshStandardMaterial({ map: makeClockTexture(), roughness: 0.5 })
+  );
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(0.3, 0.025, 12, 48),
+    new THREE.MeshStandardMaterial({ color: '#222', roughness: 0.5 })
+  );
+  g.add(face, rim);
+  g.position.set(3.1, 2.05, -ROOM.d / 2 + 0.07);
   return g;
 }

@@ -10,7 +10,7 @@ const TIMES = {
   day: {
     bg: '#aacbe6', fog: '#cfe0ee',
     sun: { color: '#fff4e0', intensity: 2.4, pos: [18, 14, 6] },
-    ambient: 0.55, hemi: 0.6,
+    ambient: 0.34, hemi: 0.42,
   },
   evening: {
     bg: '#f2a65a', fog: '#e8b27a',
@@ -24,7 +24,7 @@ const TIMES = {
   },
 };
 
-export function buildLights(scene) {
+export function buildLights(scene, env) {
   const state = { ceiling: true, lamp: true, time: 'day' };
 
   // ---- Global fill -------------------------------------------------------
@@ -61,6 +61,8 @@ export function buildLights(scene) {
     state.time = name;
     scene.background = new THREE.Color(t.bg);
     scene.fog = new THREE.Fog(t.fog, 18, 60);
+    // Image-based lighting carries day/evening; at night the lamps take over.
+    if (env !== undefined) scene.environment = name === 'night' ? null : env;
     sun.color.set(t.sun.color);
     sun.intensity = t.sun.intensity;
     sun.position.set(...t.sun.pos);

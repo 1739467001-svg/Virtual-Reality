@@ -3,7 +3,14 @@
 // position is the piece's spot on the floor, so moving = setting holder.position
 // and re-styling = clearing the holder and rebuilding its contents.
 import * as THREE from 'three';
-import { makeRugTexture } from './textures.js';
+import { makeRugTexture, makeFabricTexture, makePictureTexture } from './textures.js';
+
+// Cache woven-cloth textures so swapping the sofa doesn't regenerate canvases.
+const _fabricTex = new Map();
+function fabricTex(color) {
+  if (!_fabricTex.has(color)) _fabricTex.set(color, makeFabricTexture(color));
+  return _fabricTex.get(color);
+}
 
 const SOFA_COLORS = ['#3d5a80', '#9c6b4f', '#6b7a5e', '#7d4f5a', '#41434a', '#c98b5a'];
 const SOFA_STYLES = ['modern', 'classic'];
@@ -127,7 +134,7 @@ export function buildFurniture(scene) {
 // Individual pieces
 // --------------------------------------------------------------------------
 function fabric(color) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0 });
+  return new THREE.MeshStandardMaterial({ color, map: fabricTex(color), roughness: 0.92, metalness: 0 });
 }
 function wood(color = '#7a5230') {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 });
@@ -187,7 +194,51 @@ function buildSofa(style, color) {
     bc.position.set(sx * 0.56, 0.08 + seatH + 0.25, -0.3);
     g.add(bc);
   }
+
+  // Throw pillows + a folded blanket for a lived-in look.
+  const seatTop = 0.08 + seatH + 0.14;
+  const pillowCols = ['#d8a657', '#7a9e9f'];
+  pillowCols.forEach((pc, i) => {
+    const sx = i ? 1 : -1;
+    const pillow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.36, 0.36, 0.14),
+      new THREE.MeshStandardMaterial({ color: pc, map: fabricTex(pc), roughness: 0.95 })
+    );
+    pillow.position.set(sx * 0.78, seatTop + 0.18, -0.18);
+    pillow.rotation.set(0.16, sx * -0.35, sx * 0.22);
+    g.add(pillow);
+  });
+  const blanket = new THREE.Mesh(
+    new THREE.BoxGeometry(0.66, 0.07, 0.86),
+    new THREE.MeshStandardMaterial({ color: '#e7e2d6', map: fabricTex('#e7e2d6'), roughness: 0.95 })
+  );
+  blanket.position.set(0.36, seatTop + 0.04, 0.08);
+  blanket.rotation.z = 0.04;
+  g.add(blanket);
+
   return enableShadows(g);
+}
+
+// A book stack + mug to sit on the coffee table top.
+function tableDecor(topY) {
+  const d = new THREE.Group();
+  const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.04, 0.35),
+    new THREE.MeshStandardMaterial({ color: '#34495e', roughness: 0.7 }));
+  b1.position.set(-0.24, topY + 0.02, 0.04);
+  b1.rotation.y = 0.18;
+  const b2 = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.035, 0.31),
+    new THREE.MeshStandardMaterial({ color: '#b5651d', roughness: 0.7 }));
+  b2.position.set(-0.24, topY + 0.057, 0.04);
+  b2.rotation.y = -0.06;
+  const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.09, 20),
+    new THREE.MeshStandardMaterial({ color: '#ecf0f1', roughness: 0.35 }));
+  mug.position.set(0.26, topY + 0.045, -0.02);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.012, 8, 16),
+    new THREE.MeshStandardMaterial({ color: '#ecf0f1', roughness: 0.35 }));
+  handle.position.set(0.315, topY + 0.045, -0.02);
+  handle.rotation.y = Math.PI / 2;
+  d.add(b1, b2, mug, handle);
+  return d;
 }
 
 function buildArmchair(color) {
@@ -242,6 +293,7 @@ function buildCoffeeTable(style) {
       g.add(leg);
     }
   }
+  g.add(tableDecor(style === 'round' ? 0.45 : 0.44));
   return enableShadows(g);
 }
 
@@ -259,9 +311,10 @@ function buildTV() {
   // Screen.
   const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.86, 0.06), new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.4 }));
   frame.position.set(0, 1.1, 0);
+  const screenTex = makePictureTexture(1);
   const screen = new THREE.Mesh(
     new THREE.PlaneGeometry(1.42, 0.78),
-    new THREE.MeshStandardMaterial({ color: '#0a1622', emissive: '#16324d', emissiveIntensity: 0.5, roughness: 0.2 })
+    new THREE.MeshStandardMaterial({ map: screenTex, emissive: '#ffffff', emissiveMap: screenTex, emissiveIntensity: 0.45, roughness: 0.2 })
   );
   screen.position.set(0, 1.1, 0.035);
   g.add(frame, screen);

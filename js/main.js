@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildRoom, ROOM } from './room.js';
 import { buildLights } from './lights.js';
 import { buildFurniture } from './furniture.js';
@@ -23,9 +24,15 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 200);
 scene.add(camera);
 
+// Image-based lighting: gives every surface realistic soft fill + reflections
+// (visible on the glass, metal lamp/legs and screen) without extra light cost.
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = envTexture;
+
 // ---- World ---------------------------------------------------------------
 const room = buildRoom(scene);
-const lights = buildLights(scene);
+const lights = buildLights(scene, envTexture);
 const furniture = buildFurniture(scene);
 
 const player = new Player(camera, renderer.domElement, {

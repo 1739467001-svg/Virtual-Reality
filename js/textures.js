@@ -112,6 +112,78 @@ export function makePictureTexture(kind = 0) {
   return tex;
 }
 
+// Subtle woven-cloth look for upholstery, cushions and curtains.
+export function makeFabricTexture(color = '#3d5a80') {
+  const size = 128;
+  const c = canvas(size);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, size, size);
+  for (let x = 0; x < size; x += 3) {
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillRect(x, 0, 1, size);
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(x + 1, 0, 1, size);
+  }
+  for (let y = 0; y < size; y += 3) {
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(0, y, size, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.fillRect(0, y + 1, size, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// A simple analog clock face.
+export function makeClockTexture() {
+  const size = 256;
+  const c = canvas(size);
+  const ctx = c.getContext('2d');
+  const r = size / 2;
+  ctx.fillStyle = '#fbfbf7';
+  ctx.beginPath();
+  ctx.arc(r, r, r - 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  // Hour ticks.
+  ctx.strokeStyle = '#333';
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const x1 = r + Math.cos(a) * (r - 22), y1 = r + Math.sin(a) * (r - 22);
+    const x2 = r + Math.cos(a) * (r - 14), y2 = r + Math.sin(a) * (r - 14);
+    ctx.lineWidth = i % 3 === 0 ? 7 : 3;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  // Hands (static, ~10:10).
+  const hand = (ang, len, w, col) => {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(r, r);
+    ctx.lineTo(r + Math.cos(ang) * len, r + Math.sin(ang) * len);
+    ctx.stroke();
+  };
+  hand(-Math.PI * 0.83, r * 0.45, 8, '#222');  // hour
+  hand(-Math.PI * 0.13, r * 0.7, 5, '#222');   // minute
+  hand(Math.PI * 0.5, r * 0.75, 2, '#c0392b'); // second
+  ctx.fillStyle = '#222';
+  ctx.beginPath();
+  ctx.arc(r, r, 7, 0, Math.PI * 2);
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function shadeColor(hex, factor) {
   const { r, g, b } = hexToRgb(hex);
   const f = (v) => Math.max(0, Math.min(255, Math.round(v * factor)));
