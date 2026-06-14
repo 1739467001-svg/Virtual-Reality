@@ -1,5 +1,5 @@
-// Wires the on-screen control panel, the touch joystick and the enter/overlay
-// flow to the scene modules. Pure DOM glue — no Three.js here.
+// Wires the on-screen control panel, the touch joystick, the enter/overlay flow
+// and the save/share-by-URL feature to the scene modules. Pure DOM glue.
 
 const WALL_COLORS = [
   { name: '暖白 Warm white', hex: '#ffffff' },
@@ -14,14 +14,20 @@ const TIME_LABELS = { day: '☀️ 白天 Day', evening: '🌇 黄昏 Evening', 
 export function setupUI({ room, lights, furniture, player, mover }) {
   const $ = (id) => document.getElementById(id);
   const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  const hint = $('hint');
+  const flash = (msg) => {
+    hint.textContent = msg;
+    hint.classList.add('show');
+    clearTimeout(flash._t);
+    flash._t = setTimeout(() => hint.classList.remove('show'), 2200);
+  };
 
   // ---- Enter overlay / pointer lock -------------------------------------
   const overlay = $('overlay');
-  const enter = () => {
+  $('btn-enter').addEventListener('click', () => {
     overlay.classList.add('hidden');
     if (!isTouch) player.lockPointer();
-  };
-  $('btn-enter').addEventListener('click', enter);
+  });
   if (!isTouch) {
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement) overlay.classList.add('hidden');
@@ -29,75 +35,78 @@ export function setupUI({ room, lights, furniture, player, mover }) {
     });
   }
 
-  // ---- Light toggles -----------------------------------------------------
-  const setBtn = (el, on, label) => {
+  const setBtn = (el, on) => {
     el.classList.toggle('on', on);
     el.querySelector('.state').textContent = on ? 'ON' : 'OFF';
-    if (label) el.querySelector('.lbl').textContent = label;
   };
-  const ceiling = $('btn-ceiling'), lamp = $('btn-lamp');
-  setBtn(ceiling, lights.state.ceiling);
-  setBtn(lamp, lights.state.lamp);
-  ceiling.addEventListener('click', () => { lights.setCeiling(!lights.state.ceiling); setBtn(ceiling, lights.state.ceiling); });
-  lamp.addEventListener('click', () => { lights.setLamp(!lights.state.lamp); setBtn(lamp, lights.state.lamp); });
 
-  // ---- Time of day -------------------------------------------------------
-  let timeIdx = 0;
-  const timeBtn = $('btn-time');
-  timeBtn.querySelector('.val').textContent = TIME_LABELS[lights.times[0]];
-  timeBtn.addEventListener('click', () => {
-    timeIdx = (timeIdx + 1) % lights.times.length;
-    const t = lights.times[timeIdx];
+  // ---- Element handles ---------------------------------------------------
+  const ceiling = $('btn-ceiling'), lamp = $('btn-lamp'), timeBtn = $('btn-time');
+  const sofaColorBtn = $('btn-sofa-color'), sofaStyleBtn = $('btn-sofa-style');
+  const tableBtn = $('btn-table'), rugToggle = $('btn-rug-toggle');
+  const wallBtn = $('btn-wall'), floorBtn = $('btn-floor');
+
+  // ---- Indexed finishes (apply functions double as cycle + restore) ------
+  const idx = { wall: 0, floor: 0, time: 0 };
+  const wrap = (v, n) => ((Math.trunc(v) % n) + n) % n;
+
+  function applyTime(i) {
+    idx.time = wrap(i, lights.times.length);
+    const t = lights.times[idx.time];
     lights.setTimeOfDay(t);
     timeBtn.querySelector('.val').textContent = TIME_LABELS[t];
-  });
+  }
+  function applyWall(i) {
+    idx.wall = wrap(i, WALL_COLORS.length);
+    room.setWallColor(WALL_COLORS[idx.wall].hex);
+    wallBtn.querySelector('.val').textContent = WALL_COLORS[idx.wall].name;
+  }
+  function applyFloor(i) {
+    idx.floor = wrap(i, room.themes.length);
+    const t = room.themes[idx.floor];
+    room.setFloorTheme(t);
+    floorBtn.querySelector('.val').textContent = FLOOR_LABELS[t];
+  }
+  function refreshFurnitureLabels() {
+    sofaColorBtn.querySelector('.swatch').style.background = furniture.sofaColorHex();
+    sofaStyleBtn.querySelector('.val').textContent = furniture.info().sofaStyle;
+    tableBtn.querySelector('.val').textContent = furniture.info().table;
+    setBtn(rugToggle, furniture.state.rugVisible);
+  }
 
-  // ---- Furniture swaps ---------------------------------------------------
-  $('btn-sofa-color').addEventListener('click', (e) => {
-    const hex = furniture.cycleSofaColor();
-    e.currentTarget.querySelector('.swatch').style.background = hex;
+  // Initial labels.
+  applyTime(0); applyWall(0); applyFloor(0);
+  setBtn(ceiling, lights.state.ceiling);
+  setBtn(lamp, lights.state.lamp);
+  refreshFurnitureLabels();
+
+  // ---- Listeners: lights / time -----------------------------------------
+  ceiling.addEventListener('click', () => { lights.setCeiling(!lights.state.ceiling); setBtn(ceiling, lights.state.ceiling); });
+  lamp.addEventListener('click', () => { lights.setLamp(!lights.state.lamp); setBtn(lamp, lights.state.lamp); });
+  timeBtn.addEventListener('click', () => applyTime(idx.time + 1));
+
+  // ---- Listeners: furniture ---------------------------------------------
+  sofaColorBtn.addEventListener('click', () => {
+    furniture.cycleSofaColor();
+    sofaColorBtn.querySelector('.swatch').style.background = furniture.sofaColorHex();
   });
-  const sofaStyleBtn = $('btn-sofa-style');
-  sofaStyleBtn.querySelector('.val').textContent = furniture.info().sofaStyle;
   sofaStyleBtn.addEventListener('click', () => {
     furniture.cycleSofaStyle();
     sofaStyleBtn.querySelector('.val').textContent = furniture.info().sofaStyle;
   });
-  const tableBtn = $('btn-table');
-  tableBtn.querySelector('.val').textContent = furniture.info().table;
   tableBtn.addEventListener('click', () => {
     furniture.cycleTable();
     tableBtn.querySelector('.val').textContent = furniture.info().table;
   });
   $('btn-rug').addEventListener('click', () => furniture.cycleRug());
-  $('btn-rug-toggle').addEventListener('click', (e) => {
-    const vis = furniture.toggleRug();
-    setBtn(e.currentTarget, vis);
-  });
-  setBtn($('btn-rug-toggle'), furniture.state.rugVisible);
+  rugToggle.addEventListener('click', () => setBtn(rugToggle, furniture.toggleRug()));
 
-  // ---- Wall colour / floor ----------------------------------------------
-  let wallIdx = 0;
-  const wallBtn = $('btn-wall');
-  wallBtn.querySelector('.val').textContent = WALL_COLORS[0].name;
-  wallBtn.addEventListener('click', () => {
-    wallIdx = (wallIdx + 1) % WALL_COLORS.length;
-    room.setWallColor(WALL_COLORS[wallIdx].hex);
-    wallBtn.querySelector('.val').textContent = WALL_COLORS[wallIdx].name;
-  });
-  let floorIdx = 0;
-  const floorBtn = $('btn-floor');
-  floorBtn.querySelector('.val').textContent = FLOOR_LABELS[room.themes[0]];
-  floorBtn.addEventListener('click', () => {
-    floorIdx = (floorIdx + 1) % room.themes.length;
-    const t = room.themes[floorIdx];
-    room.setFloorTheme(t);
-    floorBtn.querySelector('.val').textContent = FLOOR_LABELS[t];
-  });
+  // ---- Listeners: finishes ----------------------------------------------
+  wallBtn.addEventListener('click', () => applyWall(idx.wall + 1));
+  floorBtn.addEventListener('click', () => applyFloor(idx.floor + 1));
 
   // ---- Move-furniture mode ----------------------------------------------
   const moveBtn = $('btn-move');
-  const hint = $('hint');
   mover.onChange = (active, msg) => {
     moveBtn.classList.toggle('on', active);
     moveBtn.querySelector('.state').textContent = active ? 'ON' : 'OFF';
@@ -106,9 +115,44 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   };
   moveBtn.addEventListener('click', () => mover.toggle());
 
+  // ---- Save & Share via URL ---------------------------------------------
+  const gather = () => Object.assign(
+    { v: 1, wl: idx.wall, fl: idx.floor, tm: idx.time, cl: lights.state.ceiling ? 1 : 0, lp: lights.state.lamp ? 1 : 0 },
+    furniture.getState()
+  );
+  const encode = (s) => btoa(encodeURIComponent(JSON.stringify(s)));
+  const decode = (str) => JSON.parse(decodeURIComponent(atob(str)));
+  function applyAll(s) {
+    if (typeof s.tm === 'number') applyTime(s.tm);
+    if (typeof s.wl === 'number') applyWall(s.wl);
+    if (typeof s.fl === 'number') applyFloor(s.fl);
+    if (s.cl !== undefined) { lights.setCeiling(!!s.cl); setBtn(ceiling, !!s.cl); }
+    if (s.lp !== undefined) { lights.setLamp(!!s.lp); setBtn(lamp, !!s.lp); }
+    furniture.applyState(s);
+    refreshFurnitureLabels();
+  }
+
+  $('btn-share').addEventListener('click', () => {
+    const url = location.origin + location.pathname + '#d=' + encode(gather());
+    history.replaceState(null, '', url);
+    const done = () => flash('🔗 已复制分享链接 · Link copied');
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(done).catch(done);
+    else done();
+  });
+  $('btn-reset').addEventListener('click', () => {
+    history.replaceState(null, '', location.pathname);
+    location.reload();
+  });
+
+  // Restore a shared layout if present in the URL.
+  if (location.hash.startsWith('#d=')) {
+    try { applyAll(decode(location.hash.slice(3))); flash('已载入分享的布置 · Shared layout loaded'); }
+    catch (e) { /* ignore malformed link */ }
+  }
+
   // ---- Panel collapse ----------------------------------------------------
   $('btn-collapse').addEventListener('click', () => {
-    document.getElementById('panel').classList.toggle('collapsed');
+    $('panel').classList.toggle('collapsed');
   });
 
   // ---- Touch joystick ----------------------------------------------------

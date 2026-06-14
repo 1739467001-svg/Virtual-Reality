@@ -121,11 +121,40 @@ export function buildFurniture(scene) {
     cycleTable() { state.table = (state.table + 1) % TABLE_STYLES.length; rebuildTable(); return TABLE_STYLES[state.table]; },
     cycleRug() { state.rug = (state.rug + 1) % RUG_COLORS.length; rebuildRug(); return state.rug; },
     toggleRug() { state.rugVisible = !state.rugVisible; rebuildRug(); return state.rugVisible; },
+    sofaColorHex() { return SOFA_COLORS[state.sofaColor]; },
     info() {
       return {
         sofaStyle: SOFA_STYLES[state.sofaStyle],
         table: TABLE_STYLES[state.table],
       };
+    },
+    // ---- Serialisable layout (for save / share via URL) ----
+    getState() {
+      const KEY = { Sofa: 's', Armchair: 'a', 'Coffee table': 't', Plant: 'pl' };
+      const p = {};
+      for (const pc of pieces) {
+        const k = KEY[pc.name];
+        if (!k || !pc.holder) continue;
+        p[k] = [Math.round(pc.holder.position.x * 100) / 100, Math.round(pc.holder.position.z * 100) / 100];
+      }
+      return { sc: state.sofaColor, ss: state.sofaStyle, tb: state.table, rg: state.rug, rv: state.rugVisible ? 1 : 0, p };
+    },
+    applyState(s) {
+      if (!s) return;
+      const mod = (v, n) => ((Math.trunc(v) % n) + n) % n;
+      if (typeof s.sc === 'number') state.sofaColor = mod(s.sc, SOFA_COLORS.length);
+      if (typeof s.ss === 'number') state.sofaStyle = mod(s.ss, SOFA_STYLES.length);
+      if (typeof s.tb === 'number') state.table = mod(s.tb, TABLE_STYLES.length);
+      if (typeof s.rg === 'number') state.rug = mod(s.rg, RUG_COLORS.length);
+      if (s.rv !== undefined) state.rugVisible = !!s.rv;
+      rebuildSofa(); rebuildTable(); rebuildRug();
+      const KEY = { Sofa: 's', Armchair: 'a', 'Coffee table': 't', Plant: 'pl' };
+      if (s.p) for (const pc of pieces) {
+        const k = KEY[pc.name];
+        if (!k || !pc.holder || !Array.isArray(s.p[k])) continue;
+        pc.holder.position.x = s.p[k][0];
+        pc.holder.position.z = s.p[k][1];
+      }
     },
   };
 }

@@ -63,6 +63,17 @@ colliders = furniture.getColliders();
 const moved = colliders.find((c) => c.minX <= 1.0 && c.maxX >= 1.0 && c.minZ <= -2.0 && c.maxZ >= -2.0);
 assert.ok(moved, 'collider follows moved furniture');
 
+// Save / restore round-trip (the share-by-URL feature).
+furniture.cycleSofaStyle(); furniture.cycleTable();
+const saved = furniture.getState();
+sofa.holder.position.set(-2.5, 0, 2.0);
+furniture.cycleSofaStyle(); furniture.cycleTable();
+furniture.applyState(saved);
+assert.ok(Math.abs(sofa.holder.position.x - saved.p.s[0]) < 0.001 &&
+  Math.abs(sofa.holder.position.z - saved.p.s[1]) < 0.001, 'applyState restores position');
+assert.strictEqual(furniture.getState().ss, saved.ss, 'applyState restores sofa style');
+assert.strictEqual(furniture.getState().tb, saved.tb, 'applyState restores table style');
+
 // Scene should now hold a healthy number of objects.
 let meshes = 0;
 scene.traverse((o) => { if (o.isMesh) meshes++; });
