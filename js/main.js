@@ -6,6 +6,7 @@ import { buildLights } from './lights.js';
 import { buildFurniture } from './furniture.js';
 import { Player } from './player.js';
 import { setupUI } from './ui.js';
+import { createMinimap } from './minimap.js';
 
 // ---- Renderer ------------------------------------------------------------
 const canvas = document.getElementById('app');
@@ -49,6 +50,13 @@ const mover = createMover();
 // ---- UI ------------------------------------------------------------------
 setupUI({ room, lights, furniture, player, mover });
 
+// ---- Minimap HUD ---------------------------------------------------------
+const minimap = createMinimap(document.getElementById('minimap'), {
+  w: ROOM.w, d: ROOM.d,
+  getColliders: () => furniture.getColliders(),
+  getPose: () => ({ x: camera.position.x, z: camera.position.z, yaw: player.yaw }),
+});
+
 // ---- WebXR button --------------------------------------------------------
 document.body.appendChild(VRButton.createButton(renderer));
 
@@ -78,6 +86,7 @@ renderer.setAnimationLoop(() => {
   else player.update(dt);
 
   mover.update();
+  minimap.update();
   renderer.render(scene, camera);
 });
 

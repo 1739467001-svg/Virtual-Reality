@@ -31,6 +31,18 @@ body {
 }
 body.locked #crosshair { opacity: 1; }
 
+/* ---- Minimap ----------------------------------------------------------- */
+#minimap {
+  position: fixed; top: 14px; left: 14px; z-index: 7;
+  width: 160px; height: 128px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  opacity: 0.92;
+}
+@media (max-width: 600px) { #minimap { width: 116px; height: 93px; } }
+
 /* ---- Hint -------------------------------------------------------------- */
 #hint {
   position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
