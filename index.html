@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#10141c" />
+  <title>虚拟看房 · Virtual House</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- Three.js is loaded from a pinned CDN version via an import map. Using an
+       absolute CDN URL also lets index.html run when opened directly (file://),
+       where local ES modules would otherwise be blocked by CORS. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="app"></canvas>
+
+  <!-- Aiming dot -->
+  <div id="crosshair"></div>
+
+  <!-- Floating hint (e.g. move mode) -->
+  <div id="hint"></div>
+
+  <!-- Touch movement joystick -->
+  <div id="joystick"><div class="knob"></div></div>
+
+  <!-- Control panel -->
+  <aside id="panel">
+    <header>
+      <h1>虚拟看房<span>Virtual House</span></h1>
+      <button id="btn-collapse" title="收起/展开">≡</button>
+    </header>
+
+    <section>
+      <div class="sec-title">💡 灯光 Lights</div>
+      <button class="btn toggle" id="btn-ceiling"><span class="lbl">吸顶灯 Ceiling</span><span class="state">ON</span></button>
+      <button class="btn toggle" id="btn-lamp"><span class="lbl">落地灯 Floor lamp</span><span class="state">ON</span></button>
+      <button class="btn value" id="btn-time"><span class="lbl">时间 Time</span><span class="val">—</span></button>
+    </section>
+
+    <section>
+      <div class="sec-title">🛋️ 家具 Furniture</div>
+      <button class="btn value" id="btn-sofa-color"><span class="lbl">沙发颜色 Sofa colour</span><span class="swatch"></span></button>
+      <button class="btn value" id="btn-sofa-style"><span class="lbl">沙发款式 Sofa style</span><span class="val">—</span></button>
+      <button class="btn value" id="btn-table"><span class="lbl">茶几 Coffee table</span><span class="val">—</span></button>
+      <button class="btn value" id="btn-rug"><span class="lbl">地毯花色 Rug colour</span><span class="val">↻</span></button>
+      <button class="btn toggle" id="btn-rug-toggle"><span class="lbl">地毯 Rug</span><span class="state">ON</span></button>
+    </section>
+
+    <section>
+      <div class="sec-title">🎨 装修 Finishes</div>
+      <button class="btn value" id="btn-wall"><span class="lbl">墙面 Wall</span><span class="val">—</span></button>
+      <button class="btn value" id="btn-floor"><span class="lbl">地板 Floor</span><span class="val">—</span></button>
+    </section>
+
+    <section>
+      <div class="sec-title">✋ 互动 Interact</div>
+      <button class="btn toggle" id="btn-move"><span class="lbl">移动家具 Move furniture</span><span class="state">OFF</span></button>
+    </section>
+  </aside>
+
+  <!-- Enter overlay -->
+  <div id="overlay">
+    <div class="card">
+      <h2>欢迎来到你的虚拟家</h2>
+      <p class="sub">Welcome — walk through, rearrange the furniture, flip the lights.</p>
+      <ul class="controls">
+        <li><b>W A S D</b> / 方向键 移动 Move</li>
+        <li><b>鼠标</b> Mouse 转动视角 Look</li>
+        <li><b>Shift</b> 快走 Run · <b>Esc</b> 释放鼠标 Release</li>
+        <li>右侧面板 切换灯光 / 家具 / 装修</li>
+        <li><b>VR</b> 头显用户可点击右下角进入沉浸模式</li>
+      </ul>
+      <button id="btn-enter">进入房间 · Enter</button>
+      <p class="tip">触屏：左下摇杆移动，右半屏滑动看四周</p>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+// Headless smoke test: stubs just enough DOM to let the Three.js scene-building
+// modules run in Node, then constructs the room, lights and furniture and
+// exercises every swap / toggle path. Catches bad Three.js API usage and math
+// errors without needing a browser or GPU. Run with: node test/smoke.mjs
+import assert from 'node:assert';
+
+// ---- Minimal DOM shim (canvas + 2D context as no-ops) --------------------
+const ctx2d = new Proxy({}, {
+  get(_t, p) {
+    if (p === 'createLinearGradient' || p === 'createRadialGradient') {
+      return () => ({ addColorStop() {} });
+    }
+    return typeof p === 'string' ? () => {} : undefined;
+  },
+  set() { return true; },
+});
+const makeCanvas = () => ({ width: 0, height: 0, style: {}, getContext: () => ctx2d });
+globalThis.document = {
+  createElement: (t) => (t === 'canvas' ? makeCanvas() : { style: {}, appendChild() {}, setAttribute() {} }),
+};
+
+// ---- Run ------------------------------------------------------------------
+// `three` resolves from node_modules (devDependency); the scene modules import
+// the same bare specifier, so everything shares one Three.js instance.
+const THREE = await import('three');
+const { buildRoom, ROOM, BOUNDS } = await import('../js/room.js');
+const { buildLights } = await import('../js/lights.js');
+const { buildFurniture } = await import('../js/furniture.js');
+
+const scene = new THREE.Scene();
+
+const room = buildRoom(scene);
+assert.ok(ROOM.w > 0 && ROOM.h > 0, 'room dimensions set');
+assert.ok(BOUNDS.maxX > BOUNDS.minX, 'bounds valid');
+room.setWallColor('#b9c7cf');
+for (const t of room.themes) room.setFloorTheme(t);
+
+const lights = buildLights(scene);
+for (const t of lights.times) lights.setTimeOfDay(t);
+lights.setCeiling(false); lights.setCeiling(true);
+lights.setLamp(false); lights.setLamp(true);
+assert.ok(scene.background && scene.fog, 'background + fog applied');
+
+const furniture = buildFurniture(scene);
+let colliders = furniture.getColliders();
+assert.ok(Array.isArray(colliders) && colliders.length >= 4, 'colliders produced');
+for (const c of colliders) assert.ok(c.maxX > c.minX && c.maxZ > c.minZ, 'collider box valid');
+assert.ok(furniture.movablePieces.length >= 3, 'has movable pieces');
+
+// Exercise every swap a couple of full cycles.
+for (let i = 0; i < 8; i++) {
+  furniture.cycleSofaColor();
+  furniture.cycleSofaStyle();
+  furniture.cycleTable();
+  furniture.cycleRug();
+}
+furniture.toggleRug(); furniture.toggleRug();
+
+// Move a piece and confirm its collider tracks the holder position.
+const sofa = furniture.movablePieces.find((p) => p.name === 'Sofa');
+sofa.holder.position.set(1.0, 0, -2.0);
+colliders = furniture.getColliders();
+const moved = colliders.find((c) => c.minX <= 1.0 && c.maxX >= 1.0 && c.minZ <= -2.0 && c.maxZ >= -2.0);
+assert.ok(moved, 'collider follows moved furniture');
+
+// Scene should now hold a healthy number of objects.
+let meshes = 0;
+scene.traverse((o) => { if (o.isMesh) meshes++; });
+assert.ok(meshes > 40, `expected a populated scene, got ${meshes} meshes`);
+
+console.log(`✅ smoke test passed — ${meshes} meshes, ${colliders.length} colliders`);
