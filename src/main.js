@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { VRButton } from "three/addons/webxr/VRButton.js";
 import { SUN, PLANETS } from "./data.js";
+import { planetTexture, cloudTexture, ringTexture, sunTexture } from "./textures.js";
 
 // ---------- 基础场景 ----------
 const scene = new THREE.Scene();
@@ -81,7 +82,7 @@ function makeLabel(text) {
 // ---------- 太阳 ----------
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(SUN.radius, 48, 48),
-  new THREE.MeshBasicMaterial({ color: SUN.color })
+  new THREE.MeshBasicMaterial({ map: sunTexture() })
 );
 sunMesh.userData = { body: SUN, isFocusable: true };
 scene.add(sunMesh);
@@ -119,46 +120,90 @@ function makeGlowTexture() {
 }
 
 // ---------- 行星 ----------
-const planetObjects = []; // { body, pivot, mesh, angle }
+// 层级结构（为支持真实自转轴倾角）：
+//   pivot(绕太阳公转) → holder(位于轨道半径处，保持竖直) → tiltGroup(按倾角倾斜)
+//     → mesh(绕自身倾斜轴自转) / ring(赤道面) / clouds / moonPivot
+const planetObjects = []; // { body, pivot, mesh, clouds, angle, orbit, label }
 const focusables = [sunMesh];
 
+// 把 RingGeometry 的 UV 重映射为「沿半径方向」，让环纹理(明暗带/卡西尼缝)正确显示
+function remapRingUV(geo, inner, outer) {
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const r = Math.hypot(v.x, v.y);
+    uv.setXY(i, (r - inner) / (outer - inner), 0.5);
+  }
+  uv.needsUpdate = true;
+}
+
 for (const p of PLANETS) {
-  // pivot 绕太阳旋转
-  const pivot = new THREE.Object3D();
+  const pivot = new THREE.Object3D(); // 公转
   scene.add(pivot);
 
+  const holder = new THREE.Object3D(); // 位于轨道半径处，始终竖直（标签用）
+  holder.position.x = p.distance;
+  pivot.add(holder);
+
+  const tiltGroup = new THREE.Object3D(); // 自转轴倾角
+  tiltGroup.rotation.z = THREE.MathUtils.degToRad(p.axialTilt || 0);
+  holder.add(tiltGroup);
+
+  const isGiant = p.type === "gasGiant" || p.type === "iceGiant";
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(p.size, 32, 32),
-    new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.85, metalness: 0.0 })
+    new THREE.SphereGeometry(p.size, 48, 48),
+    new THREE.MeshStandardMaterial({
+      map: planetTexture(p),
+      roughness: isGiant ? 0.65 : 0.95,
+      metalness: 0.0,
+    })
   );
-  mesh.position.x = p.distance;
   mesh.userData = { body: p, isFocusable: true };
-  pivot.add(mesh);
+  tiltGroup.add(mesh);
   focusables.push(mesh);
 
-  // 行星环（土星 / 天王星）
+  // 地球云层（略大的半透明球）
+  let clouds = null;
+  if (p.type === "earth") {
+    clouds = new THREE.Mesh(
+      new THREE.SphereGeometry(p.size * 1.02, 48, 48),
+      new THREE.MeshStandardMaterial({
+        map: cloudTexture(),
+        transparent: true,
+        depthWrite: false,
+        opacity: 0.9,
+      })
+    );
+    mesh.add(clouds);
+  }
+
+  // 行星环（土星 / 天王星）——位于赤道面，随倾角一起倾斜
   if (p.ring) {
-    const ringGeo = new THREE.RingGeometry(p.ring.inner, p.ring.outer, 64);
-    // 让 UV 沿半径方向，环更自然
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: p.ring.color,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.7,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI / 2.2;
-    mesh.add(ring);
+    const ringGeo = new THREE.RingGeometry(p.ring.inner, p.ring.outer, 160, 1);
+    remapRingUV(ringGeo, p.ring.inner, p.ring.outer);
+    const ring = new THREE.Mesh(
+      ringGeo,
+      new THREE.MeshBasicMaterial({
+        map: ringTexture(p.ring.color, p.seed || 21),
+        side: THREE.DoubleSide,
+        transparent: true,
+        depthWrite: false,
+      })
+    );
+    ring.rotation.x = -Math.PI / 2; // 躺平到赤道面
+    tiltGroup.add(ring);
   }
 
   // 卫星（如月球）
   if (p.moons) {
     for (const m of p.moons) {
       const moonPivot = new THREE.Object3D();
-      mesh.add(moonPivot);
+      tiltGroup.add(moonPivot);
       const moonMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(m.size, 16, 16),
-        new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.9 })
+        new THREE.SphereGeometry(m.size, 20, 20),
+        new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.95 })
       );
       moonMesh.position.x = m.distance;
       moonPivot.add(moonMesh);
@@ -169,7 +214,7 @@ for (const p of PLANETS) {
   }
 
   // 轨道线
-  const orbitGeo = new THREE.RingGeometry(p.distance - 0.05, p.distance + 0.05, 128);
+  const orbitGeo = new THREE.RingGeometry(p.distance - 0.05, p.distance + 0.05, 160);
   const orbit = new THREE.Mesh(
     orbitGeo,
     new THREE.MeshBasicMaterial({
@@ -182,12 +227,12 @@ for (const p of PLANETS) {
   orbit.rotation.x = Math.PI / 2;
   scene.add(orbit);
 
-  // 标签
+  // 标签（挂在竖直的 holder 上，始终在行星正上方）
   const label = makeLabel(p.name);
   label.position.set(0, p.size + 1.5, 0);
-  mesh.add(label);
+  holder.add(label);
 
-  planetObjects.push({ body: p, pivot, mesh, angle: p.tilt, orbit, label });
+  planetObjects.push({ body: p, pivot, mesh, clouds, angle: p.tilt, orbit, label });
 }
 
 // ---------- 小行星带（火星 ↔ 木星之间）----------
@@ -281,12 +326,14 @@ function animate() {
     asteroidBelt.rotation.y += dt * asteroidBelt.userData.spin;
 
     for (const obj of planetObjects) {
-      const { body, pivot, mesh } = obj;
+      const { body, pivot, mesh, clouds } = obj;
       // 公转：周期(年) -> 天，角速度 = 2π / (period*365)
       obj.angle += (dayStep * Math.PI * 2) / (body.orbitPeriod * 365);
       pivot.rotation.y = obj.angle;
       // 自转：周期(天)
       mesh.rotation.y += (dayStep * Math.PI * 2) / (body.rotationPeriod * 1);
+      // 云层比地表略快地飘动
+      if (clouds) clouds.rotation.y += (dayStep * Math.PI * 2) / (body.rotationPeriod * 0.85);
 
       // 卫星公转
       if (body._moonPivots) {
