@@ -30,6 +30,12 @@
   <!-- Floating hint (e.g. move mode) -->
   <div id="hint"></div>
 
+  <!-- Model loading indicator -->
+  <div id="loading">⏳ 模型加载中… Loading models…</div>
+
+  <!-- Help / re-open guide -->
+  <button id="btn-help" title="帮助 Help">?</button>
+
   <!-- Touch movement joystick -->
   <div id="joystick"><div class="knob"></div></div>
 
@@ -85,6 +91,7 @@
         <button class="btn value" id="btn-scale-up"><span class="lbl">放大 ＋</span></button>
       </div>
       <button class="btn toggle" id="btn-measure"><span class="lbl">测量 Measure</span><span class="state">OFF</span></button>
+      <button class="btn toggle" id="btn-dims"><span class="lbl">净尺寸 Dimensions</span><span class="state">OFF</span></button>
     </section>
 
     <section>
@@ -101,17 +108,31 @@
       <h2>欢迎来到你的虚拟家</h2>
       <p class="sub">Welcome — walk through, rearrange the furniture, flip the lights.</p>
       <ul class="controls">
-        <li><b>W A S D</b> / 方向键 移动 Move</li>
-        <li><b>鼠标</b> Mouse 转动视角 Look</li>
-        <li><b>Shift</b> 快走 Run · <b>Esc</b> 释放鼠标 Release</li>
-        <li>右侧面板 切换灯光 / 家具 / 装修</li>
+        <li><b>W A S D</b> / 方向键 移动 · <b>Shift</b> 快走 · <b>Esc</b> 释放鼠标</li>
+        <li><b>鼠标 / 拖屏</b> 转动视角 Look</li>
+        <li>右侧面板：换灯光 / 家具 / 装修 / <b>户型</b>，➕ 添加家具</li>
+        <li><b>移动家具</b>：点击拾起 → 移动；Q/E 或 ⟲⟳ 旋转，🎨 换色，± 缩放，Delete 删除</li>
+        <li><b>测量</b> 点地面两点量尺寸 · <b>净尺寸</b> 标房间大小 · <b>📸 拍照</b> / <b>🔗 分享</b></li>
         <li><b>VR</b> 头显用户可点击右下角进入沉浸模式</li>
       </ul>
       <button id="btn-enter">进入房间 · Enter</button>
-      <p class="tip">触屏：左下摇杆移动，右半屏滑动看四周</p>
+      <p class="tip">触屏：左下摇杆移动，右半屏滑动看四周 · 左上「?」可再看本说明</p>
     </div>
   </div>
 
+  <!-- QR code modal for the share link -->
+  <div id="qr-modal">
+    <div class="card">
+      <h3>扫码打开这套布置 · Scan to open</h3>
+      <img id="qr-img" alt="QR code" />
+      <p id="qr-err" class="err"></p>
+      <input id="qr-url" readonly />
+      <button id="qr-close">关闭 Close</button>
+    </div>
+  </div>
+
+  <!-- Offline QR generator (MIT, Kazuhiko Arase); exposes global `qrcode`. -->
+  <script src="assets/vendor/qrcode.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

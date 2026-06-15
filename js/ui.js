@@ -168,12 +168,38 @@ export function setupUI({ room, lights, furniture, player, mover }) {
     refreshFurnitureLabels();
   }
 
+  const qrModal = $('qr-modal');
+  function showQR(url) {
+    $('qr-url').value = url;
+    const img = $('qr-img'), err = $('qr-err');
+    try {
+      if (typeof globalThis.qrcode !== 'function') throw new Error('qr lib missing');
+      const qr = globalThis.qrcode(0, 'L');   // auto version, low EC = max capacity
+      qr.addData(url); qr.make();
+      img.src = qr.createDataURL(6, 8); img.style.display = '';
+      err.textContent = '';
+    } catch (e) {
+      img.style.display = 'none';
+      err.textContent = '链接过长，无法生成二维码，请直接复制下面的链接。';
+    }
+    qrModal.classList.add('show');
+  }
+  $('qr-close').addEventListener('click', () => qrModal.classList.remove('show'));
+  qrModal.addEventListener('click', (e) => { if (e.target === qrModal) qrModal.classList.remove('show'); });
+
   $('btn-share').addEventListener('click', () => {
     const url = location.origin + location.pathname + '#d=' + encode(gather());
     history.replaceState(null, '', url);
     const done = () => flash('🔗 已复制分享链接 · Link copied');
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(done).catch(done);
     else done();
+    showQR(url);
+  });
+
+  // Re-open the welcome / controls guide.
+  $('btn-help').addEventListener('click', () => {
+    overlay.classList.remove('hidden');
+    document.exitPointerLock?.();
   });
   $('btn-reset').addEventListener('click', () => {
     history.replaceState(null, '', location.pathname);

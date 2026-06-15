@@ -225,11 +225,16 @@ export function buildRoom(scene, layout = LAYOUT) {
     return kitchen.setTheme(i);
   }
 
+  // Room rectangles (centre + size) for the dimension-annotation tool.
+  const rooms = [{ name: '起居室', cx: 0, cz: 0, w: ROOM.w, d: ROOM.d }];
+  if (apartment) rooms.push({ name: '卧室', cx: 1.4, cz: (divZ + back2) / 2 - 0.3, w: ROOM.w, d: BED_D });
+  if (hasBath) rooms.push({ name: '卫生间', cx: -3.4, cz: back2 - 1.6, w: 3.2, d: 3.2 });
+
   return {
     group, setWallColor, setFloorTheme, themes: Object.keys(WOOD_THEMES),
     setPictures, cyclePictures: () => setPictures(picIdx + 1), pictureSets: PICTURE_SETS,
     setKitchen, cycleKitchen: () => kitchen.setTheme(kitchen.theme + 1), kitchenThemes: KITCHEN_THEMES.length,
-    layout, colliders, floorplan: { ext, walls },
+    rooms, layout, colliders, floorplan: { ext, walls },
   };
 }
 

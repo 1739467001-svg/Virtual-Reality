@@ -33,6 +33,7 @@ const room = buildRoom(scene);
 assert.ok(ROOM.w > 0 && ROOM.h > 0, 'room dimensions set');
 assert.ok(BOUNDS.maxX > BOUNDS.minX, 'bounds valid');
 assert.ok(Array.isArray(room.colliders) && room.floorplan && room.floorplan.ext, 'room exposes colliders + floorplan');
+assert.ok(Array.isArray(room.rooms) && room.rooms[0].w > 0, 'room exposes room rectangles for dimensions');
 room.setWallColor('#b9c7cf');
 for (const t of room.themes) room.setFloorTheme(t);
 // Swappable wall art + kitchen colour cycle through all variants.

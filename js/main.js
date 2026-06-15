@@ -135,6 +135,24 @@ mover.onChange = (active, msg) => {
 };
 document.getElementById('btn-move').addEventListener('click', () => { if (measure.active) measure.toggle(); });
 
+// ---- Room dimension labels (净尺寸) --------------------------------------
+const dimsGroup = new THREE.Group();
+dimsGroup.visible = false;
+scene.add(dimsGroup);
+for (const r of room.rooms) {
+  const l = makeLabelSprite();
+  l.set(`${Math.round(r.w)}×${Math.round(r.d)}m  ${Math.round(r.w * r.d)}㎡`);
+  l.sprite.scale.set(1.5, 0.375, 1);
+  l.sprite.position.set(r.cx, 1.6, r.cz);
+  dimsGroup.add(l.sprite);
+}
+const dimsBtn = document.getElementById('btn-dims');
+dimsBtn.addEventListener('click', () => {
+  dimsGroup.visible = !dimsGroup.visible;
+  dimsBtn.classList.toggle('on', dimsGroup.visible);
+  dimsBtn.querySelector('.state').textContent = dimsGroup.visible ? 'ON' : 'OFF';
+});
+
 // ---- Real glTF furniture models (loaded async, added via the catalogue) ---
 loadModels();
 function loadModels() {
@@ -144,6 +162,10 @@ function loadModels() {
     { type: 'realChair', url: 'assets/models/armchair.glb', width: 0.95 },
     { type: 'realVase', url: 'assets/models/vase.glb', width: 0.42 },
   ];
+  const loadEl = document.getElementById('loading');
+  let pending = specs.length;
+  loadEl?.classList.add('show');
+  const settle = () => { if (--pending <= 0) loadEl?.classList.remove('show'); };
   for (const spec of specs) {
     loader.load(spec.url, (gltf) => {
       const root = gltf.scene;
@@ -164,7 +186,8 @@ function loadModels() {
       wrap.add(root);
       wrap.scale.setScalar(s);
       furniture.registerModel(spec.type, wrap, { w: size.x * s, d: size.z * s });
-    }, undefined, (err) => console.warn('model load failed', spec.url, err));
+      settle();
+    }, undefined, (err) => { console.warn('model load failed', spec.url, err); settle(); });
   }
 }
 
