@@ -121,8 +121,8 @@ export function setupUI({ room, lights, furniture, player, mover }) {
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
     const x = Math.max(-4.6, Math.min(4.6, player.camera.position.x + fx * 1.6));
     const z = Math.max(-3.6, Math.min(3.6, player.camera.position.z + fz * 1.6));
-    furniture.addItem(t, x, z);
-    flash('已添加 ' + furniture.catalogLabel(t) + ' · 开「移动家具」可拖动/删除');
+    if (furniture.addItem(t, x, z)) flash('已添加 ' + furniture.catalogLabel(t) + ' · 开「移动家具」可拖动/删除');
+    else flash('模型加载中，请稍候 · Model still loading…');
   });
 
   // ---- Move-furniture mode ----------------------------------------------

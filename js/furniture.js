@@ -17,12 +17,16 @@ const SOFA_STYLES = ['modern', 'classic'];
 const TABLE_STYLES = ['wood', 'glass', 'round'];
 const RUG_COLORS = [['#c0392b', '#922b21'], ['#2c6e8f', '#1f4e63'], ['#caa94a', '#9c8030'], ['#555', '#333']];
 
-// Catalogue of items the user can add to / remove from the room.
-const CATALOG = ['armchair', 'stool', 'sideTable', 'pouf', 'plant', 'floorLamp', 'sideboard'];
+// Catalogue of items the user can add to / remove from the room. The "real*"
+// entries are real glTF models registered asynchronously at runtime.
+const CATALOG = ['realSofa', 'realChair', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'floorLamp', 'sideboard'];
 const CATALOG_LABELS = {
+  realSofa: '真皮沙发 Sofa·3D', realChair: '锦缎单椅 Chair·3D',
   armchair: '扶手椅 Armchair', stool: '凳子 Stool', sideTable: '边几 Side table',
   pouf: '坐墩 Pouf', plant: '绿植 Plant', floorLamp: '落地灯 Lamp', sideboard: '边柜 Sideboard',
 };
+// type -> { object: Object3D template, foot } for loaded glTF models.
+const MODELS = new Map();
 const EXTRA_COLORS = ['#7a9e9f', '#9c6b4f', '#41434a', '#c98b5a', '#6b7a5e', '#7d4f5a'];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
@@ -149,6 +153,7 @@ export function buildFurniture(scene) {
     getMovable: () => pieces.filter((p) => p.movable),
     addItem,
     removeItem,
+    registerModel: (type, object, foot) => MODELS.set(type, { object, foot }),
     catalogTypes: CATALOG,
     catalogLabel: (t) => CATALOG_LABELS[t] || t,
     state,
@@ -472,6 +477,11 @@ function buildRug(colorIndex) {
 // Factory for catalogue items the user can drop into the room.
 // Returns { object, foot } or null for an unknown type.
 function buildExtra(type) {
+  // Real glTF models registered at runtime take priority.
+  if (MODELS.has(type)) {
+    const m = MODELS.get(type);
+    return { object: m.object.clone(true), foot: m.foot };
+  }
   switch (type) {
     case 'armchair':
       return { object: buildArmchair(pick(EXTRA_COLORS)), foot: { w: 1.0, d: 1.0 } };

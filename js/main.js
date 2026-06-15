@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { buildRoom, ROOM } from './room.js';
 import { buildLights } from './lights.js';
 import { buildFurniture } from './furniture.js';
@@ -60,11 +66,57 @@ const minimap = createMinimap(document.getElementById('minimap'), {
 // ---- WebXR button --------------------------------------------------------
 document.body.appendChild(VRButton.createButton(renderer));
 
+// ---- Post-processing (bloom + anti-alias), bypassed in XR ----------------
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.5, 0.95);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+composer.addPass(new SMAAPass(innerWidth, innerHeight));
+let hq = true;
+const hqBtn = document.getElementById('btn-hq');
+const setHqLabel = () => { hqBtn.classList.toggle('on', hq); hqBtn.querySelector('.state').textContent = hq ? 'ON' : 'OFF'; };
+setHqLabel();
+hqBtn.addEventListener('click', () => { hq = !hq; setHqLabel(); });
+
+// ---- Real glTF furniture models (loaded async, added via the catalogue) ---
+loadModels();
+function loadModels() {
+  const loader = new GLTFLoader();
+  const specs = [
+    { type: 'realSofa', url: 'assets/models/sofa.glb', width: 2.2 },
+    { type: 'realChair', url: 'assets/models/armchair.glb', width: 0.95 },
+  ];
+  for (const spec of specs) {
+    loader.load(spec.url, (gltf) => {
+      const root = gltf.scene;
+      // Strip any baked-in lights and enable shadows.
+      const lightsToRemove = [];
+      root.traverse((o) => {
+        if (o.isLight) lightsToRemove.push(o);
+        if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+      });
+      lightsToRemove.forEach((l) => l.parent && l.parent.remove(l));
+      // Normalise: centre on X/Z, sit on the floor, scale to a target width.
+      const box = new THREE.Box3().setFromObject(root);
+      const size = box.getSize(new THREE.Vector3());
+      const centre = box.getCenter(new THREE.Vector3());
+      root.position.set(-centre.x, -box.min.y, -centre.z);
+      const s = spec.width / (size.x || 1);
+      const wrap = new THREE.Group();
+      wrap.add(root);
+      wrap.scale.setScalar(s);
+      furniture.registerModel(spec.type, wrap, { w: size.x * s, d: size.z * s });
+    }, undefined, (err) => console.warn('model load failed', spec.url, err));
+  }
+}
+
 // ---- Resize --------------------------------------------------------------
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
 });
 
 // ---- Loop ----------------------------------------------------------------
@@ -87,7 +139,8 @@ renderer.setAnimationLoop(() => {
 
   mover.update();
   minimap.update();
-  renderer.render(scene, camera);
+  if (presenting || !hq) renderer.render(scene, camera);
+  else composer.render();
 });
 
 // --------------------------------------------------------------------------

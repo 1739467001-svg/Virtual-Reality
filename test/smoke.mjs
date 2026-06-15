@@ -74,6 +74,10 @@ assert.ok(Math.abs(sofa.holder.position.x - saved.p.s[0]) < 0.001 &&
 assert.strictEqual(furniture.getState().ss, saved.ss, 'applyState restores sofa style');
 assert.strictEqual(furniture.getState().tb, saved.tb, 'applyState restores table style');
 
+// Real-model catalogue types resolve once a template is registered.
+furniture.registerModel('realSofa', new THREE.Group(), { w: 2, d: 1 });
+furniture.registerModel('realChair', new THREE.Group(), { w: 1, d: 1 });
+
 // Add / remove catalogue items.
 const before = furniture.getMovable().length;
 for (const t of furniture.catalogTypes) assert.ok(furniture.addItem(t, 0, 0), `addItem(${t})`);
