@@ -47,6 +47,33 @@ function clearGroup(g) {
   }
 }
 
+// Recolour a placed catalogue item by tinting every material (cloned once so we
+// never bleed onto shared/cached materials or other instances of a glTF model).
+function setItemColor(piece, hex) {
+  if (!piece._mats) {
+    piece._mats = [];
+    piece.holder.traverse((o) => {
+      if (o.isMesh && o.material) {
+        const arr = Array.isArray(o.material) ? o.material : [o.material];
+        const cloned = arr.map((m) => m.clone());
+        o.material = Array.isArray(o.material) ? cloned : cloned[0];
+        piece._mats.push(...cloned);
+      }
+    });
+  }
+  for (const m of piece._mats) if (m.color) m.color.set(hex);
+  piece.color = hex;
+}
+
+// Uniformly scale a placed item (clamped) and keep its collision footprint in sync.
+function setItemScale(piece, scale) {
+  const s = Math.max(0.5, Math.min(2, scale));
+  piece.holder.scale.setScalar(s);
+  piece.scale = s;
+  if (piece.baseFoot) piece.foot = { w: piece.baseFoot.w * s, d: piece.baseFoot.d * s };
+  return s;
+}
+
 export function buildFurniture(scene) {
   const group = new THREE.Group();
   scene.add(group);
@@ -133,7 +160,10 @@ export function buildFurniture(scene) {
     holder.rotation.y = typeof rot === 'number' ? rot : Math.random() * Math.PI * 2;
     holder.add(enableShadows(made.object));
     group.add(holder);
-    const piece = { name: `${type}-${nextId++}`, type, holder, foot: made.foot, movable: true, removable: true };
+    const piece = {
+      name: `${type}-${nextId++}`, type, holder, foot: made.foot,
+      baseFoot: { ...made.foot }, scale: 1, color: null, movable: true, removable: true,
+    };
     pieces.push(piece);
     return piece;
   }
@@ -153,6 +183,8 @@ export function buildFurniture(scene) {
     getMovable: () => pieces.filter((p) => p.movable),
     addItem,
     removeItem,
+    setItemColor,
+    setItemScale,
     registerModel: (type, object, foot) => MODELS.set(type, { object, foot }),
     catalogTypes: CATALOG,
     catalogLabel: (t) => CATALOG_LABELS[t] || t,
@@ -186,6 +218,8 @@ export function buildFurniture(scene) {
           t: pc.type,
           p: [r2(pc.holder.position.x), r2(pc.holder.position.z)],
           r: r2(pc.holder.rotation.y),
+          s: pc.scale && pc.scale !== 1 ? r2(pc.scale) : undefined,
+          c: pc.color || undefined,
         })),
       };
     },
@@ -209,7 +243,13 @@ export function buildFurniture(scene) {
       // Recreate dynamically-added items.
       for (const pc of pieces.filter((p) => p.removable)) removeItem(pc);
       if (Array.isArray(s.ex)) for (const it of s.ex) {
-        if (it && it.t && Array.isArray(it.p)) addItem(it.t, it.p[0], it.p[1], it.r);
+        if (it && it.t && Array.isArray(it.p)) {
+          const pc = addItem(it.t, it.p[0], it.p[1], it.r);
+          if (pc) {
+            if (typeof it.s === 'number') setItemScale(pc, it.s);
+            if (it.c) setItemColor(pc, it.c);
+          }
+        }
       }
     },
   };

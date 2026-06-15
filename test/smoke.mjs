@@ -108,14 +108,28 @@ assert.ok(furniture.removeItem(added), 'removeItem works');
 const rotated = furniture.addItem('stool', 1, 1, 0.77);
 assert.ok(Math.abs(rotated.holder.rotation.y - 0.77) < 0.001, 'addItem applies rotation');
 
-// Extras survive a save / restore round-trip (incl. rotation).
+// Recolour + scale a placed item, and check the footprint tracks the scale.
+furniture.setItemColor(rotated, '#3d6b8f');
+assert.strictEqual(rotated.color, '#3d6b8f', 'setItemColor records colour');
+assert.ok(rotated._mats && rotated._mats.length, 'setItemColor cloned materials');
+const baseW = rotated.foot.w;
+const s = furniture.setItemScale(rotated, 1.5);
+assert.strictEqual(s, 1.5, 'setItemScale returns clamped scale');
+assert.ok(Math.abs(rotated.holder.scale.x - 1.5) < 1e-6, 'holder scaled');
+assert.ok(Math.abs(rotated.foot.w - baseW * 1.5) < 1e-6, 'footprint tracks scale');
+assert.strictEqual(furniture.setItemScale(rotated, 9), 2, 'scale is clamped to max 2');
+
+// Extras survive a save / restore round-trip (incl. rotation, scale, colour).
 const withExtras = furniture.getState();
 assert.ok(withExtras.ex.length >= 1, 'extras serialised');
 assert.ok(withExtras.ex.every((e) => typeof e.r === 'number'), 'extras carry rotation');
+assert.ok(withExtras.ex.some((e) => e.c === '#3d6b8f' && e.s === 2), 'extras carry colour + scale');
 furniture.applyState({ ...withExtras, ex: [] });
 assert.strictEqual(furniture.getState().ex.length, 0, 'applyState clears extras');
 furniture.applyState(withExtras);
-assert.strictEqual(furniture.getState().ex.length, withExtras.ex.length, 'applyState restores extras');
+const restored = furniture.getState();
+assert.strictEqual(restored.ex.length, withExtras.ex.length, 'applyState restores extras');
+assert.ok(restored.ex.some((e) => e.c === '#3d6b8f' && e.s === 2), 'restored extras keep colour + scale');
 
 // Scene should now hold a healthy number of objects.
 let meshes = 0;

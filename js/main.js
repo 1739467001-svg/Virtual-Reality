@@ -103,9 +103,37 @@ document.getElementById('btn-shot').addEventListener('click', () => {
   link.click();
 });
 
-// Wire the rotate buttons to the furniture mover.
+// Wire the rotate / recolour / scale buttons to the furniture mover.
 document.getElementById('btn-rot-l').addEventListener('click', () => mover.rotate(0.26));
 document.getElementById('btn-rot-r').addEventListener('click', () => mover.rotate(-0.26));
+document.getElementById('btn-color').addEventListener('click', () => mover.recolor());
+document.getElementById('btn-scale-up').addEventListener('click', () => mover.scaleBy(1.1));
+document.getElementById('btn-scale-dn').addEventListener('click', () => mover.scaleBy(1 / 1.1));
+
+// ---- Tape measure tool ---------------------------------------------------
+const measure = createMeasure();
+const measBtn = document.getElementById('btn-measure');
+const setMeasBtn = () => {
+  measBtn.classList.toggle('on', measure.active);
+  measBtn.querySelector('.state').textContent = measure.active ? 'ON' : 'OFF';
+};
+measure.onChange = (active, msg) => {
+  setMeasBtn();
+  const hint = document.getElementById('hint');
+  hint.textContent = msg || ''; hint.classList.toggle('show', !!msg);
+  document.body.classList.toggle('aiming', active || mover.active);
+};
+measBtn.addEventListener('click', () => {
+  if (!measure.active && mover.active) mover.toggle();   // mutually exclusive with move mode
+  measure.toggle();
+});
+// Keep the crosshair visible while aiming in either mode; move cancels measuring.
+const baseMoverOnChange = mover.onChange;
+mover.onChange = (active, msg) => {
+  baseMoverOnChange?.(active, msg);
+  document.body.classList.toggle('aiming', active || measure.active);
+};
+document.getElementById('btn-move').addEventListener('click', () => { if (measure.active) measure.toggle(); });
 
 // ---- Real glTF furniture models (loaded async, added via the catalogue) ---
 loadModels();
@@ -166,6 +194,7 @@ renderer.setAnimationLoop(() => {
   else player.update(dt);
 
   mover.update();
+  measure.update();
   minimap.update();
   renderFrame();
 });
@@ -184,6 +213,8 @@ function createMover() {
   const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const centre = new THREE.Vector2(0, 0);
   const hitPoint = new THREE.Vector3();
+  const ITEM_COLORS = ['#c0563f', '#3d6b8f', '#6b8f5e', '#caa94a', '#7d5a86', '#4a4f57', '#d7cfc2'];
+  let colorIdx = -1;
   let active = false;
   let selected = null;
 
@@ -209,6 +240,21 @@ function createMover() {
     rotate(delta) {
       if (!active || !selected) { announce('先在移动模式下拾起家具再旋转 · Pick up a piece first'); return; }
       selected.holder.rotation.y += delta;
+    },
+    // Recolour the held catalogue item (built-ins keep their dedicated controls).
+    recolor() {
+      if (!active || !selected) { announce('先拾起家具再换色 · Pick up a piece first'); return; }
+      if (!selected.removable) { announce('内置家具请用上方「家具」里的专用配色 · Use the built-in finish controls'); return; }
+      colorIdx = (colorIdx + 1) % ITEM_COLORS.length;
+      furniture.setItemColor(selected, ITEM_COLORS[colorIdx]);
+      announce('已换色 · Recoloured');
+    },
+    // Scale the held catalogue item (clamped in furniture.setItemScale).
+    scaleBy(f) {
+      if (!active || !selected) { announce('先拾起家具再缩放 · Pick up a piece first'); return; }
+      if (!selected.removable) { announce('内置家具暂不支持缩放 · Built-ins can\'t be scaled'); return; }
+      const s = furniture.setItemScale(selected, selected.scale * f);
+      announce('缩放 Scale ×' + s.toFixed(2));
     },
   };
 
@@ -255,6 +301,91 @@ function createMover() {
   });
 
   return api;
+}
+
+// --------------------------------------------------------------------------
+// Tape measure: aim the crosshair at the floor, click two points to get the
+// distance. A line + endpoint markers + a floating label show the result.
+// --------------------------------------------------------------------------
+function createMeasure() {
+  const ray = new THREE.Raycaster();
+  const centre = new THREE.Vector2(0, 0);
+  const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const hit = new THREE.Vector3();
+  const grp = new THREE.Group();
+  scene.add(grp);
+
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({ color: 0xffd24a, depthTest: false })
+  );
+  line.renderOrder = 998; line.visible = false; grp.add(line);
+  const marker = () => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffd24a, depthTest: false }));
+    m.renderOrder = 998; m.visible = false; grp.add(m); return m;
+  };
+  const mA = marker(), mB = marker();
+  const label = makeLabelSprite(); label.sprite.visible = false; grp.add(label.sprite);
+
+  let active = false, A = null;
+  const floorPoint = () => { ray.setFromCamera(centre, camera); return ray.ray.intersectPlane(floor, hit) ? hit.clone() : null; };
+  function draw(a, b) {
+    line.geometry.setFromPoints([a, b]); line.geometry.attributes.position.needsUpdate = true;
+    line.visible = true; mB.position.copy(b); mB.visible = true;
+    const mid = a.clone().add(b).multiplyScalar(0.5); mid.y = 0.35;
+    label.sprite.position.copy(mid); label.set(a.distanceTo(b).toFixed(2) + ' m'); label.sprite.visible = true;
+  }
+  function clear() { A = null; line.visible = false; mA.visible = false; mB.visible = false; label.sprite.visible = false; }
+  function announce(msg) { api.onChange?.(active, msg); }
+
+  const api = {
+    active: false,
+    onChange: null,
+    toggle() {
+      active = !active; api.active = active;
+      if (!active) { clear(); announce(''); }
+      else announce('测量：准星对准地面，点击放下两个点 · Tap two floor points to measure');
+    },
+    update() { if (active && A) { const p = floorPoint(); if (p) draw(A, p); } },
+  };
+
+  renderer.domElement.addEventListener('pointerdown', () => {
+    if (!active) return;
+    const p = floorPoint();
+    if (!p) return;
+    if (!A) {
+      A = p; mA.position.copy(p); mA.visible = true; mB.visible = false; line.visible = false; label.sprite.visible = false;
+      announce('再点一下放第二个点 · Tap the second point');
+    } else {
+      draw(A, p);
+      announce('距离 Distance ' + A.distanceTo(p).toFixed(2) + ' m · 再点开始新测量 · tap to restart');
+      A = null;
+    }
+  });
+
+  return api;
+}
+
+// A small canvas-textured sprite used as a floating distance label.
+function makeLabelSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.scale.set(0.8, 0.2, 1);
+  sprite.renderOrder = 999;
+  function set(text) {
+    ctx.clearRect(0, 0, 256, 64);
+    ctx.fillStyle = 'rgba(18,22,30,0.85)';
+    ctx.fillRect(6, 12, 244, 40);
+    ctx.font = 'bold 30px system-ui, sans-serif';
+    ctx.fillStyle = '#ffd24a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 33);
+    tex.needsUpdate = true;
+  }
+  return { sprite, set };
 }
 
 // --------------------------------------------------------------------------

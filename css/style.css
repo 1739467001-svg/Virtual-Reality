@@ -29,7 +29,7 @@ body {
   pointer-events: none; z-index: 5;
   opacity: 0; transition: opacity 0.3s;
 }
-body.locked #crosshair { opacity: 1; }
+body.locked #crosshair, body.aiming #crosshair { opacity: 1; }
 
 /* ---- Minimap ----------------------------------------------------------- */
 #minimap {
