@@ -120,6 +120,9 @@ export function buildRoom(scene, layout = LAYOUT) {
   group.add(buildCurtains(win));
   group.add(buildClock());
 
+  // ---- Open kitchen along the living-room left wall ---------------------
+  buildKitchen(group, colliders);
+
   // ---- Apartment: append a bedroom past the (now interior) front wall ----
   // Living-room geometry above is untouched; the existing door opening at
   // z = +d/2 becomes the doorway between the two rooms.
@@ -407,10 +410,12 @@ function buildBathroom(group, colliders, walls, wallMat, back2) {
   colliders.push({ minX: br, maxX: x1, minZ: z0 - t / 2, maxZ: z0 + t / 2 });
   walls.push({ x1: x0, z: z0, x2: bl }, { x1: br, z: z0, x2: x1 });
 
-  // Fixtures along the far/left walls.
+  // Fixtures: toilet + sink along the left wall, shower in the far-right corner.
   group.add(buildToilet(x0 + 0.55, z1 - 0.55));
   group.add(buildSink(x0 + 0.45, midZ + 0.1));
   colliders.push({ minX: x0, maxX: x0 + 1.0, minZ: z1 - 1.05, maxZ: z1 });
+  group.add(buildShower(x1 - 0.45, z1 - 0.45));
+  colliders.push({ minX: x1 - 0.9, maxX: x1, minZ: z1 - 0.9, maxZ: z1 });
 
   const light = new THREE.PointLight('#eaf2ff', 7, 6, 2);
   light.position.set(midX, ROOM.h - 0.3, midZ);
@@ -443,6 +448,71 @@ function buildSink(x, z) {
   mirror.rotation.y = Math.PI / 2; mirror.position.set(-0.08, 1.45, 0); g.add(mirror);
   g.position.set(x, 0, z);
   return g;
+}
+
+// Corner shower: tray + two glass panels + a wall-mounted head. Centred on a
+// 0.9 m square footprint whose +x / +z sides are the room walls.
+function buildShower(x, z) {
+  const g = new THREE.Group();
+  const s = 0.9;
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(s, 0.06, s),
+    new THREE.MeshStandardMaterial({ color: '#e7ebed', roughness: 0.3 }));
+  tray.position.y = 0.03; tray.receiveShadow = true; g.add(tray);
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: '#cfe0ea', transmission: 0.9, transparent: true, opacity: 0.3, roughness: 0.05, metalness: 0,
+  });
+  const panelF = new THREE.Mesh(new THREE.BoxGeometry(s, 1.95, 0.03), glassMat);
+  panelF.position.set(0, 1.0, -s / 2); g.add(panelF);          // panel facing -z
+  const panelL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 1.95, s), glassMat);
+  panelL.position.set(-s / 2, 1.0, 0); g.add(panelL);          // panel facing -x
+  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 16),
+    new THREE.MeshStandardMaterial({ color: '#c9ccce', metalness: 0.8, roughness: 0.3 }));
+  head.position.set(s / 2 - 0.08, 1.95, s / 2 - 0.08); g.add(head);
+  g.position.set(x, 0, z);
+  return g;
+}
+
+// Open kitchen run along the living-room left wall (x = -w/2), present in every
+// layout so the home reads as a proper studio/apartment.
+function buildKitchen(group, colliders) {
+  const x = -ROOM.w / 2, depth = 0.6;
+  const z0 = -3.4, z1 = 0.3, len = z1 - z0, cz = (z0 + z1) / 2;   // ends before the bookshelf
+  const cabMat = new THREE.MeshStandardMaterial({ color: '#3f4a52', roughness: 0.5 });
+  const topMat = new THREE.MeshStandardMaterial({ color: '#d9d9d2', roughness: 0.3, metalness: 0.1 });
+  const upMat = new THREE.MeshStandardMaterial({ color: '#eae6de', roughness: 0.6 });
+  const steelMat = new THREE.MeshStandardMaterial({ color: '#aab0b4', metalness: 0.7, roughness: 0.3 });
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(depth, 0.85, len), cabMat);
+  base.position.set(x + depth / 2, 0.425, cz); base.castShadow = true; base.receiveShadow = true; group.add(base);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(depth + 0.04, 0.06, len), topMat);
+  top.position.set(x + depth / 2, 0.88, cz); group.add(top);
+  const up = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.7, len * 0.66), upMat);
+  up.position.set(x + 0.17, 1.85, cz - 0.3); up.castShadow = true; group.add(up);
+
+  // Sink basin + faucet.
+  const sink = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.5), steelMat);
+  sink.position.set(x + depth / 2, 0.85, cz - 1.4); group.add(sink);
+  const faucet = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.28, 10), steelMat);
+  faucet.position.set(x + 0.2, 1.02, cz - 1.4); group.add(faucet);
+
+  // Cooktop with four burners + range hood.
+  const hob = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.5),
+    new THREE.MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.4 }));
+  hob.position.set(x + depth / 2, 0.915, cz + 0.9); group.add(hob);
+  for (const dx of [-0.12, 0.12]) for (const dz of [-0.12, 0.12]) {
+    const burner = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.01, 16),
+      new THREE.MeshStandardMaterial({ color: '#2b2b2e', roughness: 0.5 }));
+    burner.position.set(x + depth / 2 + dx, 0.93, cz + 0.9 + dz); group.add(burner);
+  }
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.6), steelMat);
+  hood.position.set(x + 0.21, 1.72, cz + 0.9); group.add(hood);
+
+  // Fridge at the +z end.
+  const fridge = new THREE.Mesh(new THREE.BoxGeometry(0.64, 1.9, 0.66),
+    new THREE.MeshStandardMaterial({ color: '#dfe3e6', metalness: 0.4, roughness: 0.4 }));
+  fridge.position.set(x + 0.34, 0.95, z1 - 0.33); fridge.castShadow = true; group.add(fridge);
+
+  colliders.push({ minX: x, maxX: x + depth, minZ: z0 - 0.05, maxZ: z1 + 0.05 });
 }
 
 // Window frame + glass inside the right-wall opening.
