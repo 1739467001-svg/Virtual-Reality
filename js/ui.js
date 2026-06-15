@@ -105,6 +105,26 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   wallBtn.addEventListener('click', () => applyWall(idx.wall + 1));
   floorBtn.addEventListener('click', () => applyFloor(idx.floor + 1));
 
+  // ---- Add furniture from the catalogue ---------------------------------
+  let addIdx = 0;
+  const addTypeBtn = $('btn-add-type');
+  const setAddLabel = () => {
+    addTypeBtn.querySelector('.val').textContent = furniture.catalogLabel(furniture.catalogTypes[addIdx]);
+  };
+  setAddLabel();
+  addTypeBtn.addEventListener('click', () => {
+    addIdx = (addIdx + 1) % furniture.catalogTypes.length;
+    setAddLabel();
+  });
+  $('btn-add').addEventListener('click', () => {
+    const t = furniture.catalogTypes[addIdx];
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+    const x = Math.max(-4.6, Math.min(4.6, player.camera.position.x + fx * 1.6));
+    const z = Math.max(-3.6, Math.min(3.6, player.camera.position.z + fz * 1.6));
+    furniture.addItem(t, x, z);
+    flash('已添加 ' + furniture.catalogLabel(t) + ' · 开「移动家具」可拖动/删除');
+  });
+
   // ---- Move-furniture mode ----------------------------------------------
   const moveBtn = $('btn-move');
   mover.onChange = (active, msg) => {

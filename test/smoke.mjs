@@ -45,7 +45,7 @@ const furniture = buildFurniture(scene);
 let colliders = furniture.getColliders();
 assert.ok(Array.isArray(colliders) && colliders.length >= 4, 'colliders produced');
 for (const c of colliders) assert.ok(c.maxX > c.minX && c.maxZ > c.minZ, 'collider box valid');
-assert.ok(furniture.movablePieces.length >= 3, 'has movable pieces');
+assert.ok(furniture.getMovable().length >= 3, 'has movable pieces');
 
 // Exercise every swap a couple of full cycles.
 for (let i = 0; i < 8; i++) {
@@ -57,7 +57,7 @@ for (let i = 0; i < 8; i++) {
 furniture.toggleRug(); furniture.toggleRug();
 
 // Move a piece and confirm its collider tracks the holder position.
-const sofa = furniture.movablePieces.find((p) => p.name === 'Sofa');
+const sofa = furniture.getMovable().find((p) => p.name === 'Sofa');
 sofa.holder.position.set(1.0, 0, -2.0);
 colliders = furniture.getColliders();
 const moved = colliders.find((c) => c.minX <= 1.0 && c.maxX >= 1.0 && c.minZ <= -2.0 && c.maxZ >= -2.0);
@@ -73,6 +73,21 @@ assert.ok(Math.abs(sofa.holder.position.x - saved.p.s[0]) < 0.001 &&
   Math.abs(sofa.holder.position.z - saved.p.s[1]) < 0.001, 'applyState restores position');
 assert.strictEqual(furniture.getState().ss, saved.ss, 'applyState restores sofa style');
 assert.strictEqual(furniture.getState().tb, saved.tb, 'applyState restores table style');
+
+// Add / remove catalogue items.
+const before = furniture.getMovable().length;
+for (const t of furniture.catalogTypes) assert.ok(furniture.addItem(t, 0, 0), `addItem(${t})`);
+assert.strictEqual(furniture.getMovable().length, before + furniture.catalogTypes.length, 'items added');
+const added = furniture.getMovable().find((p) => p.removable);
+assert.ok(furniture.removeItem(added), 'removeItem works');
+
+// Extras survive a save / restore round-trip.
+const withExtras = furniture.getState();
+assert.ok(withExtras.ex.length >= 1, 'extras serialised');
+furniture.applyState({ ...withExtras, ex: [] });
+assert.strictEqual(furniture.getState().ex.length, 0, 'applyState clears extras');
+furniture.applyState(withExtras);
+assert.strictEqual(furniture.getState().ex.length, withExtras.ex.length, 'applyState restores extras');
 
 // Scene should now hold a healthy number of objects.
 let meshes = 0;

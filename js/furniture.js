@@ -17,6 +17,15 @@ const SOFA_STYLES = ['modern', 'classic'];
 const TABLE_STYLES = ['wood', 'glass', 'round'];
 const RUG_COLORS = [['#c0392b', '#922b21'], ['#2c6e8f', '#1f4e63'], ['#caa94a', '#9c8030'], ['#555', '#333']];
 
+// Catalogue of items the user can add to / remove from the room.
+const CATALOG = ['armchair', 'stool', 'sideTable', 'pouf', 'plant', 'floorLamp', 'sideboard'];
+const CATALOG_LABELS = {
+  armchair: '扶手椅 Armchair', stool: '凳子 Stool', sideTable: '边几 Side table',
+  pouf: '坐墩 Pouf', plant: '绿植 Plant', floorLamp: '落地灯 Lamp', sideboard: '边柜 Sideboard',
+};
+const EXTRA_COLORS = ['#7a9e9f', '#9c6b4f', '#41434a', '#c98b5a', '#6b7a5e', '#7d4f5a'];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
 function enableShadows(obj) {
   obj.traverse((o) => {
     if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
@@ -110,11 +119,38 @@ export function buildFurniture(scene) {
     });
   }
 
+  // ---- Add / remove catalogue items -------------------------------------
+  let nextId = 1;
+  function addItem(type, x = 0, z = 0) {
+    const made = buildExtra(type);
+    if (!made) return null;
+    const holder = new THREE.Group();
+    holder.position.set(x, 0, z);
+    holder.rotation.y = Math.random() * Math.PI * 2;
+    holder.add(enableShadows(made.object));
+    group.add(holder);
+    const piece = { name: `${type}-${nextId++}`, type, holder, foot: made.foot, movable: true, removable: true };
+    pieces.push(piece);
+    return piece;
+  }
+  function removeItem(piece) {
+    const i = pieces.indexOf(piece);
+    if (i < 0 || !piece.removable) return false;
+    pieces.splice(i, 1);
+    group.remove(piece.holder);
+    clearGroup(piece.holder);
+    return true;
+  }
+
   // ---- Public API --------------------------------------------------------
   return {
     group,
     getColliders,
-    movablePieces: pieces.filter((p) => p.movable),
+    getMovable: () => pieces.filter((p) => p.movable),
+    addItem,
+    removeItem,
+    catalogTypes: CATALOG,
+    catalogLabel: (t) => CATALOG_LABELS[t] || t,
     state,
     cycleSofaColor() { state.sofaColor = (state.sofaColor + 1) % SOFA_COLORS.length; rebuildSofa(); return SOFA_COLORS[state.sofaColor]; },
     cycleSofaStyle() { state.sofaStyle = (state.sofaStyle + 1) % SOFA_STYLES.length; rebuildSofa(); return SOFA_STYLES[state.sofaStyle]; },
@@ -137,7 +173,14 @@ export function buildFurniture(scene) {
         if (!k || !pc.holder) continue;
         p[k] = [Math.round(pc.holder.position.x * 100) / 100, Math.round(pc.holder.position.z * 100) / 100];
       }
-      return { sc: state.sofaColor, ss: state.sofaStyle, tb: state.table, rg: state.rug, rv: state.rugVisible ? 1 : 0, p };
+      return {
+        sc: state.sofaColor, ss: state.sofaStyle, tb: state.table, rg: state.rug,
+        rv: state.rugVisible ? 1 : 0, p,
+        ex: pieces.filter((pc) => pc.type).map((pc) => ({
+          t: pc.type,
+          p: [Math.round(pc.holder.position.x * 100) / 100, Math.round(pc.holder.position.z * 100) / 100],
+        })),
+      };
     },
     applyState(s) {
       if (!s) return;
@@ -154,6 +197,11 @@ export function buildFurniture(scene) {
         if (!k || !pc.holder || !Array.isArray(s.p[k])) continue;
         pc.holder.position.x = s.p[k][0];
         pc.holder.position.z = s.p[k][1];
+      }
+      // Recreate dynamically-added items.
+      for (const pc of pieces.filter((p) => p.removable)) removeItem(pc);
+      if (Array.isArray(s.ex)) for (const it of s.ex) {
+        if (it && it.t && Array.isArray(it.p)) addItem(it.t, it.p[0], it.p[1]);
       }
     },
   };
@@ -419,4 +467,80 @@ function buildRug(colorIndex) {
   rug.position.y = 0.012;
   rug.receiveShadow = true;
   return rug;
+}
+
+// Factory for catalogue items the user can drop into the room.
+// Returns { object, foot } or null for an unknown type.
+function buildExtra(type) {
+  switch (type) {
+    case 'armchair':
+      return { object: buildArmchair(pick(EXTRA_COLORS)), foot: { w: 1.0, d: 1.0 } };
+    case 'plant':
+      return { object: buildPlant(), foot: { w: 0.85, d: 0.85 } };
+    case 'stool': {
+      const g = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.07, 20), fabric(pick(EXTRA_COLORS)));
+      seat.position.y = 0.46;
+      g.add(seat);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.46), wood('#5a3a1f'));
+        leg.position.set(Math.cos(a) * 0.15, 0.23, Math.sin(a) * 0.15);
+        leg.rotation.set(Math.cos(a) * 0.12, 0, -Math.sin(a) * 0.12);
+        g.add(leg);
+      }
+      return { object: g, foot: { w: 0.45, d: 0.45 } };
+    }
+    case 'pouf': {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.32, 0.4, 24), fabric(pick(EXTRA_COLORS)));
+      p.position.y = 0.2;
+      return { object: p, foot: { w: 0.66, d: 0.66 } };
+    }
+    case 'sideTable': {
+      const g = new THREE.Group();
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.05, 28), wood('#6b4423'));
+      top.position.y = 0.52;
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 12), metal('#3a3a3a'));
+      ped.position.y = 0.26;
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.03, 20), metal('#3a3a3a'));
+      foot.position.y = 0.015;
+      g.add(top, ped, foot);
+      return { object: g, foot: { w: 0.6, d: 0.6 } };
+    }
+    case 'floorLamp': {
+      const g = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.05, 20), metal('#2b2b2b'));
+      base.position.y = 0.025;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.4, 12), metal('#2b2b2b'));
+      pole.position.y = 0.72;
+      const shade = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.24, 0.3, 24, 1, true),
+        new THREE.MeshStandardMaterial({ color: '#f3e7cf', emissive: '#ffd98a', emissiveIntensity: 0.6, roughness: 0.6, side: THREE.DoubleSide })
+      );
+      shade.position.y = 1.5;
+      g.add(base, pole, shade);
+      return { object: g, foot: { w: 0.5, d: 0.5 } };
+    }
+    case 'sideboard': {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.55, 0.45), wood('#6b4a2e'));
+      body.position.y = 0.4;
+      g.add(body);
+      for (let i = 0; i < 2; i++) {
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.42, 0.02), wood('#7d5836'));
+        door.position.set(-0.3 + i * 0.6, 0.4, 0.235);
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), metal('#caa84a'));
+        knob.position.set(-0.3 + i * 0.6 + (i ? -0.2 : 0.2), 0.4, 0.26);
+        g.add(door, knob);
+      }
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16), wood('#3a2a1c'));
+        leg.position.set(sx * 0.52, 0.08, sz * 0.18);
+        g.add(leg);
+      }
+      return { object: g, foot: { w: 1.25, d: 0.5 } };
+    }
+    default:
+      return null;
+  }
 }

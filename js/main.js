@@ -99,7 +99,6 @@ function createMover() {
   const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const centre = new THREE.Vector2(0, 0);
   const hitPoint = new THREE.Vector3();
-  const pieces = furniture.movablePieces;
   let active = false;
   let selected = null;
 
@@ -124,6 +123,7 @@ function createMover() {
   };
 
   function pick() {
+    const pieces = furniture.getMovable();
     ray.setFromCamera(centre, camera);
     const hits = ray.intersectObjects(pieces.map((p) => p.holder), true);
     if (!hits.length) return null;
@@ -138,8 +138,17 @@ function createMover() {
   function announce(msg) { api.onChange?.(active, msg); }
   function drop() {
     if (selected) { selected.holder.position.y = 0; selected = null; }
-    announce(active ? '移动模式：点击家具拾起 · Click furniture to pick up' : '');
+    announce(active ? '移动模式：点击拾起 · 选中后按 Delete 删除 · Click to pick up, Delete to remove' : '');
   }
+
+  // Delete the selected piece (catalogue items only).
+  addEventListener('keydown', (e) => {
+    if (!active || !selected) return;
+    if (e.code === 'Delete' || e.code === 'Backspace' || e.code === 'KeyX') {
+      if (furniture.removeItem(selected)) { selected = null; announce('已删除 · Removed'); }
+      else announce('该家具不可删除 · This piece can\'t be removed');
+    }
+  });
 
   renderer.domElement.addEventListener('pointerdown', () => {
     if (!active) return;
