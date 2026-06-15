@@ -35,6 +35,9 @@ assert.ok(BOUNDS.maxX > BOUNDS.minX, 'bounds valid');
 assert.ok(Array.isArray(room.colliders) && room.floorplan && room.floorplan.ext, 'room exposes colliders + floorplan');
 room.setWallColor('#b9c7cf');
 for (const t of room.themes) room.setFloorTheme(t);
+// Swappable wall art + kitchen colour cycle through all variants.
+for (let i = 0; i < room.pictureSets + 1; i++) assert.strictEqual(room.cyclePictures(), (i + 1) % room.pictureSets, 'cyclePictures wraps');
+for (let i = 0; i < room.kitchenThemes + 1; i++) assert.ok(room.cycleKitchen() < room.kitchenThemes, 'cycleKitchen in range');
 
 // Multi-room layouts build without error and add a divided plan.
 for (const layout of ['oneBed', 'suite']) {
@@ -96,6 +99,7 @@ assert.strictEqual(furniture.getState().tb, saved.tb, 'applyState restores table
 // Real-model catalogue types resolve once a template is registered.
 furniture.registerModel('realSofa', new THREE.Group(), { w: 2, d: 1 });
 furniture.registerModel('realChair', new THREE.Group(), { w: 1, d: 1 });
+furniture.registerModel('realVase', new THREE.Group(), { w: 0.4, d: 0.4 });
 
 // Add / remove catalogue items.
 const before = furniture.getMovable().length;

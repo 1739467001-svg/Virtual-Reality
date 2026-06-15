@@ -46,6 +46,14 @@ const WOOD_THEMES = {
   grey: '#8d8d8d',
 };
 
+const PICTURE_SETS = 3;   // makePictureTexture has 3 art variants
+const KITCHEN_THEMES = [
+  { cab: '#3f4a52', top: '#d9d9d2' },   // slate / light stone
+  { cab: '#6b4a32', top: '#e8e2d6' },   // walnut / cream
+  { cab: '#2f5d50', top: '#1f2123' },   // forest green / black
+  { cab: '#c7cdd2', top: '#caa46a' },   // light grey / wood
+];
+
 export function buildRoom(scene, layout = LAYOUT) {
   const group = new THREE.Group();
   scene.add(group);
@@ -109,9 +117,12 @@ export function buildRoom(scene, layout = LAYOUT) {
   // ---- Baseboards --------------------------------------------------------
   group.add(buildBaseboards(door));
 
-  // ---- Framed pictures ---------------------------------------------------
-  group.add(makePicture(0, new THREE.Vector3(-2.4, 1.7, -ROOM.d / 2 + 0.09), 0));
-  group.add(makePicture(1, new THREE.Vector3(0.2, 1.7, -ROOM.d / 2 + 0.09), 0));
+  // ---- Framed pictures (art is swappable) -------------------------------
+  const picA = makePicture(0, new THREE.Vector3(-2.4, 1.7, -ROOM.d / 2 + 0.09), 0);
+  const picB = makePicture(1, new THREE.Vector3(0.2, 1.7, -ROOM.d / 2 + 0.09), 0);
+  group.add(picA, picB);
+  const picMats = [picA.userData.artMat, picB.userData.artMat];
+  let picIdx = 0;
 
   // ---- Exterior seen through the window ---------------------------------
   group.add(buildExterior());
@@ -121,7 +132,7 @@ export function buildRoom(scene, layout = LAYOUT) {
   group.add(buildClock());
 
   // ---- Open kitchen along the living-room left wall ---------------------
-  buildKitchen(group, colliders);
+  const kitchen = buildKitchen(group, colliders);
 
   // ---- Apartment: append a bedroom past the (now interior) front wall ----
   // Living-room geometry above is untouched; the existing door opening at
@@ -201,9 +212,23 @@ export function buildRoom(scene, layout = LAYOUT) {
     floorMat.map = newTex;
     floorMat.needsUpdate = true;
   }
+  function setPictures(i) {
+    picIdx = ((Math.trunc(i) % PICTURE_SETS) + PICTURE_SETS) % PICTURE_SETS;
+    picMats.forEach((m, k) => {
+      m.map?.dispose?.();
+      m.map = makePictureTexture(picIdx + k);
+      m.needsUpdate = true;
+    });
+    return picIdx;
+  }
+  function setKitchen(i) {
+    return kitchen.setTheme(i);
+  }
 
   return {
     group, setWallColor, setFloorTheme, themes: Object.keys(WOOD_THEMES),
+    setPictures, cyclePictures: () => setPictures(picIdx + 1), pictureSets: PICTURE_SETS,
+    setKitchen, cycleKitchen: () => kitchen.setTheme(kitchen.theme + 1), kitchenThemes: KITCHEN_THEMES.length,
     layout, colliders, floorplan: { ext, walls },
   };
 }
@@ -279,6 +304,7 @@ function makePicture(kind, pos, ry) {
   g.add(frame, art);
   g.position.copy(pos);
   g.rotation.y = ry;
+  g.userData.artMat = art.material;   // exposed so the art can be swapped
   return g;
 }
 
@@ -477,8 +503,8 @@ function buildShower(x, z) {
 function buildKitchen(group, colliders) {
   const x = -ROOM.w / 2, depth = 0.6;
   const z0 = -3.4, z1 = 0.3, len = z1 - z0, cz = (z0 + z1) / 2;   // ends before the bookshelf
-  const cabMat = new THREE.MeshStandardMaterial({ color: '#3f4a52', roughness: 0.5 });
-  const topMat = new THREE.MeshStandardMaterial({ color: '#d9d9d2', roughness: 0.3, metalness: 0.1 });
+  const cabMat = new THREE.MeshStandardMaterial({ color: KITCHEN_THEMES[0].cab, roughness: 0.5 });
+  const topMat = new THREE.MeshStandardMaterial({ color: KITCHEN_THEMES[0].top, roughness: 0.3, metalness: 0.1 });
   const upMat = new THREE.MeshStandardMaterial({ color: '#eae6de', roughness: 0.6 });
   const steelMat = new THREE.MeshStandardMaterial({ color: '#aab0b4', metalness: 0.7, roughness: 0.3 });
 
@@ -513,6 +539,18 @@ function buildKitchen(group, colliders) {
   fridge.position.set(x + 0.34, 0.95, z1 - 0.33); fridge.castShadow = true; group.add(fridge);
 
   colliders.push({ minX: x, maxX: x + depth, minZ: z0 - 0.05, maxZ: z1 + 0.05 });
+
+  // Theme controller: recolour cabinets (base + uppers) and countertop.
+  const ctrl = {
+    theme: 0,
+    setTheme(i) {
+      ctrl.theme = ((Math.trunc(i) % KITCHEN_THEMES.length) + KITCHEN_THEMES.length) % KITCHEN_THEMES.length;
+      const t = KITCHEN_THEMES[ctrl.theme];
+      cabMat.color.set(t.cab); upMat.color.set(t.cab); topMat.color.set(t.top);
+      return ctrl.theme;
+    },
+  };
+  return ctrl;
 }
 
 // Window frame + glass inside the right-wall opening.

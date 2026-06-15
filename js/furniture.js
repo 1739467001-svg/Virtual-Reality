@@ -19,11 +19,12 @@ const RUG_COLORS = [['#c0392b', '#922b21'], ['#2c6e8f', '#1f4e63'], ['#caa94a', 
 
 // Catalogue of items the user can add to / remove from the room. The "real*"
 // entries are real glTF models registered asynchronously at runtime.
-const CATALOG = ['realSofa', 'realChair', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'floorLamp', 'sideboard'];
+const CATALOG = ['realSofa', 'realChair', 'realVase', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'bed', 'diningSet', 'floorLamp', 'sideboard'];
 const CATALOG_LABELS = {
-  realSofa: '真皮沙发 Sofa·3D', realChair: '锦缎单椅 Chair·3D',
+  realSofa: '真皮沙发 Sofa·3D', realChair: '锦缎单椅 Chair·3D', realVase: '花瓶花艺 Vase·3D',
   armchair: '扶手椅 Armchair', stool: '凳子 Stool', sideTable: '边几 Side table',
-  pouf: '坐墩 Pouf', plant: '绿植 Plant', floorLamp: '落地灯 Lamp', sideboard: '边柜 Sideboard',
+  pouf: '坐墩 Pouf', plant: '绿植 Plant', bed: '床 Bed', diningSet: '餐桌椅 Dining set',
+  floorLamp: '落地灯 Lamp', sideboard: '边柜 Sideboard',
 };
 // type -> { object: Object3D template, foot } for loaded glTF models.
 const MODELS = new Map();
@@ -592,6 +593,49 @@ function buildExtra(type) {
         g.add(leg);
       }
       return { object: g, foot: { w: 1.25, d: 0.5 } };
+    }
+    case 'bed': {
+      const g = new THREE.Group();
+      const frameMat = wood('#6b4a32');
+      const W = 1.6, L = 2.05;
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(W + 0.12, 0.28, L + 0.12), frameMat);
+      frame.position.y = 0.18; g.add(frame);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(W + 0.12, 0.7, 0.1), frameMat);
+      head.position.set(0, 0.45, -L / 2 - 0.01); g.add(head);
+      const mattress = new THREE.Mesh(new THREE.BoxGeometry(W, 0.2, L), new THREE.MeshStandardMaterial({ color: '#eae4d8', roughness: 0.95 }));
+      mattress.position.y = 0.42; g.add(mattress);
+      const duvet = new THREE.Mesh(new THREE.BoxGeometry(W + 0.04, 0.1, L * 0.6), fabric(pick(EXTRA_COLORS)));
+      duvet.position.set(0, 0.54, L * 0.18); g.add(duvet);
+      for (const sx of [-1, 1]) {
+        const pillow = new THREE.Mesh(new THREE.BoxGeometry(W * 0.4, 0.12, 0.4), new THREE.MeshStandardMaterial({ color: '#f5f1e8', roughness: 0.95 }));
+        pillow.position.set(sx * W * 0.22, 0.58, -L / 2 + 0.32); g.add(pillow);
+      }
+      return { object: g, foot: { w: W + 0.12, d: L + 0.12 } };
+    }
+    case 'diningSet': {
+      const g = new THREE.Group();
+      const topMat = wood('#7a5230');
+      const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.85), topMat);
+      top.position.y = 0.74; g.add(top);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.72), topMat);
+        leg.position.set(sx * 0.62, 0.37, sz * 0.36); g.add(leg);
+      }
+      const chairMat = fabric(pick(EXTRA_COLORS));
+      const chair = (px, pz, ry) => {
+        const c = new THREE.Group();
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 0.4), chairMat);
+        seat.position.y = 0.45; c.add(seat);
+        const back = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.45, 0.05), chairMat);
+        back.position.set(0, 0.68, -0.18); c.add(back);
+        for (const lx of [-1, 1]) for (const lz of [-1, 1]) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.45), wood('#4a2a17'));
+          leg.position.set(lx * 0.16, 0.225, lz * 0.16); c.add(leg);
+        }
+        c.position.set(px, 0, pz); c.rotation.y = ry; return c;
+      };
+      g.add(chair(0, 0.62, 0), chair(0, -0.62, Math.PI), chair(0.85, 0, -Math.PI / 2), chair(-0.85, 0, Math.PI / 2));
+      return { object: g, foot: { w: 1.9, d: 1.9 } };
     }
     default:
       return null;

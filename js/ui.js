@@ -45,9 +45,10 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   const sofaColorBtn = $('btn-sofa-color'), sofaStyleBtn = $('btn-sofa-style');
   const tableBtn = $('btn-table'), rugToggle = $('btn-rug-toggle');
   const wallBtn = $('btn-wall'), floorBtn = $('btn-floor');
+  const picBtn = $('btn-pic'), kitchenBtn = $('btn-kitchen');
 
   // ---- Indexed finishes (apply functions double as cycle + restore) ------
-  const idx = { wall: 0, floor: 0, time: 0 };
+  const idx = { wall: 0, floor: 0, time: 0, pic: 0, kitchen: 0 };
   const wrap = (v, n) => ((Math.trunc(v) % n) + n) % n;
 
   function applyTime(i) {
@@ -67,6 +68,14 @@ export function setupUI({ room, lights, furniture, player, mover }) {
     room.setFloorTheme(t);
     floorBtn.querySelector('.val').textContent = FLOOR_LABELS[t];
   }
+  function applyPicture(i) {
+    idx.pic = room.setPictures(i);
+    picBtn.querySelector('.val').textContent = '画面 ' + (idx.pic + 1) + '/' + room.pictureSets;
+  }
+  function applyKitchen(i) {
+    idx.kitchen = room.setKitchen(i);
+    kitchenBtn.querySelector('.val').textContent = '配色 ' + (idx.kitchen + 1) + '/' + room.kitchenThemes;
+  }
   function refreshFurnitureLabels() {
     sofaColorBtn.querySelector('.swatch').style.background = furniture.sofaColorHex();
     sofaStyleBtn.querySelector('.val').textContent = furniture.info().sofaStyle;
@@ -75,7 +84,7 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   }
 
   // Initial labels.
-  applyTime(0); applyWall(0); applyFloor(0);
+  applyTime(0); applyWall(0); applyFloor(0); applyPicture(0); applyKitchen(0);
   setBtn(ceiling, lights.state.ceiling);
   setBtn(lamp, lights.state.lamp);
   refreshFurnitureLabels();
@@ -104,6 +113,8 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   // ---- Listeners: finishes ----------------------------------------------
   wallBtn.addEventListener('click', () => applyWall(idx.wall + 1));
   floorBtn.addEventListener('click', () => applyFloor(idx.floor + 1));
+  picBtn.addEventListener('click', () => applyPicture(idx.pic + 1));
+  kitchenBtn.addEventListener('click', () => applyKitchen(idx.kitchen + 1));
 
   // ---- Add furniture from the catalogue ---------------------------------
   let addIdx = 0;
@@ -137,7 +148,10 @@ export function setupUI({ room, lights, furniture, player, mover }) {
 
   // ---- Save & Share via URL ---------------------------------------------
   const gather = () => Object.assign(
-    { v: 1, wl: idx.wall, fl: idx.floor, tm: idx.time, cl: lights.state.ceiling ? 1 : 0, lp: lights.state.lamp ? 1 : 0 },
+    {
+      v: 1, wl: idx.wall, fl: idx.floor, tm: idx.time, pk: idx.pic, kt: idx.kitchen,
+      cl: lights.state.ceiling ? 1 : 0, lp: lights.state.lamp ? 1 : 0,
+    },
     furniture.getState()
   );
   const encode = (s) => btoa(encodeURIComponent(JSON.stringify(s)));
@@ -146,6 +160,8 @@ export function setupUI({ room, lights, furniture, player, mover }) {
     if (typeof s.tm === 'number') applyTime(s.tm);
     if (typeof s.wl === 'number') applyWall(s.wl);
     if (typeof s.fl === 'number') applyFloor(s.fl);
+    if (typeof s.pk === 'number') applyPicture(s.pk);
+    if (typeof s.kt === 'number') applyKitchen(s.kt);
     if (s.cl !== undefined) { lights.setCeiling(!!s.cl); setBtn(ceiling, !!s.cl); }
     if (s.lp !== undefined) { lights.setLamp(!!s.lp); setBtn(lamp, !!s.lp); }
     furniture.applyState(s);

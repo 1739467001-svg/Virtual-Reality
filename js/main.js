@@ -142,6 +142,7 @@ function loadModels() {
   const specs = [
     { type: 'realSofa', url: 'assets/models/sofa.glb', width: 2.2 },
     { type: 'realChair', url: 'assets/models/armchair.glb', width: 0.95 },
+    { type: 'realVase', url: 'assets/models/vase.glb', width: 0.42 },
   ];
   for (const spec of specs) {
     loader.load(spec.url, (gltf) => {
