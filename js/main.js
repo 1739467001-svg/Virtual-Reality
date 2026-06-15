@@ -153,42 +153,70 @@ dimsBtn.addEventListener('click', () => {
   dimsBtn.querySelector('.state').textContent = dimsGroup.visible ? 'ON' : 'OFF';
 });
 
-// ---- Real glTF furniture models (loaded async, added via the catalogue) ---
-loadModels();
-function loadModels() {
-  const loader = new GLTFLoader();
-  const specs = [
-    { type: 'realSofa', url: 'assets/models/sofa.glb', width: 2.2 },
-    { type: 'realChair', url: 'assets/models/armchair.glb', width: 0.95 },
-    { type: 'realVase', url: 'assets/models/vase.glb', width: 0.42 },
-  ];
-  const loadEl = document.getElementById('loading');
-  let pending = specs.length;
-  loadEl?.classList.add('show');
-  const settle = () => { if (--pending <= 0) loadEl?.classList.remove('show'); };
-  for (const spec of specs) {
-    loader.load(spec.url, (gltf) => {
-      const root = gltf.scene;
-      // Strip any baked-in lights and enable shadows.
-      const lightsToRemove = [];
-      root.traverse((o) => {
-        if (o.isLight) lightsToRemove.push(o);
-        if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
-      });
-      lightsToRemove.forEach((l) => l.parent && l.parent.remove(l));
-      // Normalise: centre on X/Z, sit on the floor, scale to a target width.
-      const box = new THREE.Box3().setFromObject(root);
-      const size = box.getSize(new THREE.Vector3());
-      const centre = box.getCenter(new THREE.Vector3());
-      root.position.set(-centre.x, -box.min.y, -centre.z);
-      const s = spec.width / (size.x || 1);
-      const wrap = new THREE.Group();
-      wrap.add(root);
-      wrap.scale.setScalar(s);
-      furniture.registerModel(spec.type, wrap, { w: size.x * s, d: size.z * s });
-      settle();
-    }, undefined, (err) => { console.warn('model load failed', spec.url, err); settle(); });
-  }
+// ---- Real glTF furniture models ------------------------------------------
+// Light models are preloaded; heavy ones (lantern, ~9 MB) load on first add.
+const gltfLoader = new GLTFLoader();
+const PRELOAD_MODELS = [
+  { type: 'realSofa', url: 'assets/models/sofa.glb', width: 2.2 },
+  { type: 'realChair', url: 'assets/models/armchair.glb', width: 0.95 },
+  { type: 'realVase', url: 'assets/models/vase.glb', width: 0.42 },
+];
+const LAZY_MODELS = {
+  realLamp: { type: 'realLamp', url: 'assets/models/lantern.glb', height: 1.4 },
+};
+const loadingEl = document.getElementById('loading');
+
+(function preloadModels() {
+  let pending = PRELOAD_MODELS.length;
+  loadingEl?.classList.add('show');
+  const settle = () => { if (--pending <= 0) loadingEl?.classList.remove('show'); };
+  for (const spec of PRELOAD_MODELS) loadModel(spec, settle);
+})();
+
+// Lazy-load on demand: furniture asks for a model the first time it's placed.
+const lazyLoading = new Set();
+furniture.setModelRequest((type) => {
+  const spec = LAZY_MODELS[type];
+  if (!spec || furniture.hasModel(type) || lazyLoading.has(type)) return;
+  lazyLoading.add(type);
+  loadingEl?.classList.add('show');
+  loadModel(spec, (ok) => {
+    loadingEl?.classList.remove('show');
+    lazyLoading.delete(type);
+    flashHint(ok ? '真实模型已就绪 · 再次点击「放入房间」' : '模型加载失败 · Load failed');
+  });
+});
+
+function loadModel(spec, done) {
+  gltfLoader.load(spec.url, (gltf) => {
+    const root = gltf.scene;
+    // Strip any baked-in lights and enable shadows.
+    const lightsToRemove = [];
+    root.traverse((o) => {
+      if (o.isLight) lightsToRemove.push(o);
+      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    });
+    lightsToRemove.forEach((l) => l.parent && l.parent.remove(l));
+    // Normalise: centre on X/Z, sit on the floor, scale to a target size.
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const centre = box.getCenter(new THREE.Vector3());
+    root.position.set(-centre.x, -box.min.y, -centre.z);
+    const s = spec.height ? spec.height / (size.y || 1) : spec.width / (size.x || 1);
+    const wrap = new THREE.Group();
+    wrap.add(root);
+    wrap.scale.setScalar(s);
+    furniture.registerModel(spec.type, wrap, { w: size.x * s, d: size.z * s });
+    done?.(true);
+  }, undefined, (err) => { console.warn('model load failed', spec.url, err); done?.(false); });
+}
+
+function flashHint(msg) {
+  const h = document.getElementById('hint');
+  if (!h) return;
+  h.textContent = msg; h.classList.add('show');
+  clearTimeout(flashHint._t);
+  flashHint._t = setTimeout(() => h.classList.remove('show'), 2600);
 }
 
 // ---- Resize --------------------------------------------------------------

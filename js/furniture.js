@@ -19,10 +19,10 @@ const RUG_COLORS = [['#c0392b', '#922b21'], ['#2c6e8f', '#1f4e63'], ['#caa94a', 
 
 // Catalogue of items the user can add to / remove from the room. The "real*"
 // entries are real glTF models registered asynchronously at runtime.
-const CATALOG = ['realSofa', 'realChair', 'realVase', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'bed', 'diningSet', 'floorLamp', 'sideboard'];
+const CATALOG = ['realSofa', 'realChair', 'realVase', 'realLamp', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'bed', 'diningSet', 'floorLamp', 'sideboard'];
 const CATALOG_LABELS = {
   realSofa: '真皮沙发 Sofa·3D', realChair: '锦缎单椅 Chair·3D', realVase: '花瓶花艺 Vase·3D',
-  armchair: '扶手椅 Armchair', stool: '凳子 Stool', sideTable: '边几 Side table',
+  realLamp: '真实灯具 Lantern·3D', armchair: '扶手椅 Armchair', stool: '凳子 Stool', sideTable: '边几 Side table',
   pouf: '坐墩 Pouf', plant: '绿植 Plant', bed: '床 Bed', diningSet: '餐桌椅 Dining set',
   floorLamp: '落地灯 Lamp', sideboard: '边柜 Sideboard',
 };
@@ -153,9 +153,10 @@ export function buildFurniture(scene) {
 
   // ---- Add / remove catalogue items -------------------------------------
   let nextId = 1;
+  let onModelRequest = null;   // set by main: kick off lazy glTF loads on demand
   function addItem(type, x = 0, z = 0, rot) {
     const made = buildExtra(type);
-    if (!made) return null;
+    if (!made) { onModelRequest?.(type); return null; }
     const holder = new THREE.Group();
     holder.position.set(x, 0, z);
     holder.rotation.y = typeof rot === 'number' ? rot : Math.random() * Math.PI * 2;
@@ -187,6 +188,8 @@ export function buildFurniture(scene) {
     setItemColor,
     setItemScale,
     registerModel: (type, object, foot) => MODELS.set(type, { object, foot }),
+    hasModel: (type) => MODELS.has(type),
+    setModelRequest: (fn) => { onModelRequest = fn; },
     catalogTypes: CATALOG,
     catalogLabel: (t) => CATALOG_LABELS[t] || t,
     state,

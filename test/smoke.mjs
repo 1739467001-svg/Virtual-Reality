@@ -101,6 +101,13 @@ assert.strictEqual(furniture.getState().tb, saved.tb, 'applyState restores table
 furniture.registerModel('realSofa', new THREE.Group(), { w: 2, d: 1 });
 furniture.registerModel('realChair', new THREE.Group(), { w: 1, d: 1 });
 furniture.registerModel('realVase', new THREE.Group(), { w: 0.4, d: 0.4 });
+furniture.registerModel('realLamp', new THREE.Group(), { w: 0.6, d: 0.6 });
+
+// Lazy models: addItem of an unregistered model fires the request hook + returns null.
+let requested = null;
+furniture.setModelRequest((t) => { requested = t; });
+assert.strictEqual(furniture.addItem('realCouchNope', 0, 0), null, 'unknown model returns null');
+assert.strictEqual(requested, 'realCouchNope', 'addItem fires model-request hook for unloaded models');
 
 // Add / remove catalogue items.
 const before = furniture.getMovable().length;
