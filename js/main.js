@@ -7,7 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-import { buildRoom, ROOM, LAYOUT } from './room.js';
+import { buildRoom, ROOM, LAYOUT, LAYOUTS, LAYOUT_LABELS } from './room.js';
 import { buildLights } from './lights.js';
 import { buildFurniture } from './furniture.js';
 import { Player } from './player.js';
@@ -66,13 +66,13 @@ const minimap = createMinimap(document.getElementById('minimap'), {
   getPose: () => ({ x: camera.position.x, z: camera.position.z, yaw: player.yaw }),
 });
 
-// ---- Floor-plan (户型) toggle: persists choice and reloads --------------
+// ---- Floor-plan (户型) toggle: cycles layouts, persists choice, reloads --
 const layoutBtn = document.getElementById('btn-layout');
 if (layoutBtn) {
   const label = layoutBtn.querySelector('.val');
-  if (label) label.textContent = LAYOUT === 'apartment' ? '两居 2-room' : '单间 Studio';
+  if (label) label.textContent = LAYOUT_LABELS[LAYOUT] || LAYOUT;
   layoutBtn.addEventListener('click', () => {
-    const next = LAYOUT === 'apartment' ? 'studio' : 'apartment';
+    const next = LAYOUTS[(LAYOUTS.indexOf(LAYOUT) + 1) % LAYOUTS.length];
     try { localStorage.setItem('vh_layout', next); } catch { /* ignore */ }
     location.reload();
   });

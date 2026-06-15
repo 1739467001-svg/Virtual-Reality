@@ -8,18 +8,27 @@ import { makeWoodTexture, makeWallTexture, makePictureTexture, makeFabricTexture
 // are all authored against this box centred on the origin).
 export const ROOM = { w: 10, d: 8, h: 3.2, wall: 0.15 };
 
-// Floor-plan layouts. "studio" = the single living room. "apartment" appends a
-// bedroom in +z, turning the old entrance door into the inter-room doorway.
+// Floor-plan layouts:
+//   studio — the single living room (default).
+//   oneBed — living room + a bedroom (一室一厅).
+//   suite  — oneBed plus an en-suite bathroom carved into the bedroom (一室一厅一卫).
 const BED_D = 6;                       // bedroom depth, appended past z = +d/2
+export const LAYOUTS = ['studio', 'oneBed', 'suite'];
+export const LAYOUT_LABELS = { studio: '单间 Studio', oneBed: '一室一厅 1B·1L', suite: '一室一厅一卫 +Bath' };
+function normLayout(v) {
+  if (v === 'oneBed' || v === 'apartment') return 'oneBed';  // 'apartment' = legacy name
+  if (v === 'suite') return 'suite';
+  return 'studio';
+}
 export function readLayout() {
   try {
-    if (globalThis.__VH_LAYOUT__) return globalThis.__VH_LAYOUT__;
-    if (globalThis.localStorage && localStorage.getItem('vh_layout') === 'apartment') return 'apartment';
+    if (globalThis.__VH_LAYOUT__) return normLayout(globalThis.__VH_LAYOUT__);
+    if (globalThis.localStorage) return normLayout(localStorage.getItem('vh_layout'));
   } catch { /* no localStorage (e.g. Node tests) */ }
   return 'studio';
 }
 export const LAYOUT = readLayout();
-const zMax = (layout) => (layout === 'apartment' ? ROOM.d / 2 + BED_D : ROOM.d / 2);
+const zMax = (layout) => (layout === 'studio' ? ROOM.d / 2 : ROOM.d / 2 + BED_D);
 
 // Keep the player a little away from the surfaces. maxZ extends into the
 // bedroom when the apartment layout is active.
@@ -40,7 +49,8 @@ const WOOD_THEMES = {
 export function buildRoom(scene, layout = LAYOUT) {
   const group = new THREE.Group();
   scene.add(group);
-  const apartment = layout === 'apartment';
+  const apartment = layout !== 'studio';
+  const hasBath = layout === 'suite';
   const colliders = [];   // static obstacles the player collides with (interior walls, bed)
 
   // ---- Floor -------------------------------------------------------------
@@ -131,18 +141,19 @@ export function buildRoom(scene, layout = LAYOUT) {
     bCeil.rotation.x = Math.PI / 2; bCeil.position.set(0, ROOM.h, cz); bCeil.receiveShadow = true;
     group.add(bCeil);
 
-    // Bedroom side walls (no openings).
+    // Bedroom side walls. The right wall gets a window onto the garden.
+    const bWinZ = divZ + 1.5, bWinY = 1.0 + 0.7 - ROOM.h / 2;
     const bLeft = makeWallPanel(BED_D, ROOM.h, null, wallMat);
     bLeft.position.set(-ROOM.w / 2, ROOM.h / 2, cz); bLeft.rotation.y = Math.PI / 2;
     group.add(bLeft);
-    const bRight = makeWallPanel(BED_D, ROOM.h, null, wallMat);
+    const bRight = makeWallPanel(BED_D, ROOM.h, { x: bWinZ - cz, y: bWinY, w: 1.8, h: 1.4 }, wallMat);
     bRight.position.set(ROOM.w / 2, ROOM.h / 2, cz); bRight.rotation.y = -Math.PI / 2;
     group.add(bRight);
+    group.add(buildWindow({ x: bWinZ, y: bWinY, w: 1.8, h: 1.4 }));
 
-    // Bedroom far wall with the apartment's outer entrance door (world x = ent.x;
-    // the panel is rotated 180° so its hole's local x is negated, as on the
-    // living-room front wall).
-    const ent = { x: -2.2, y: -ROOM.h / 2 + 1.05, w: 1.15, h: 2.1 };
+    // Bedroom far wall with the apartment's outer entrance door. Centred when a
+    // bathroom occupies the far-left corner, otherwise on the left.
+    const ent = { x: hasBath ? 0 : -2.2, y: -ROOM.h / 2 + 1.05, w: 1.15, h: 2.1 };
     const farWall = makeWallPanel(ROOM.w, ROOM.h, { ...ent, x: -ent.x }, wallMat);
     farWall.position.set(0, ROOM.h / 2, back2); farWall.rotation.y = Math.PI;
     group.add(farWall);
@@ -157,26 +168,23 @@ export function buildRoom(scene, layout = LAYOUT) {
     seg(dr, ROOM.w / 2);
     walls.push({ x1: -ROOM.w / 2, z: divZ, x2: dl }, { x1: dr, z: divZ, x2: ROOM.w / 2 });
 
-    // Furnish + light the bedroom. Bed sits in the far corner, headboard to the
-    // back wall and clear of the entrance door (at x = ent.x = -2.2).
+    // Bed in the far-right corner, headboard to the back wall — clear of the
+    // entrance door and (for the suite) of the bathroom in the far-left corner.
     const bed = buildBed();
-    bed.position.set(1.6, 0, back2 - 1.2);
+    bed.position.set(3.6, 0, back2 - 1.6);
     bed.rotation.y = Math.PI;             // headboard faces the far wall (+z)
     group.add(bed);
-    colliders.push({ minX: 0.5, maxX: 2.7, minZ: back2 - 2.3, maxZ: back2 - 0.15 });
-    group.add(buildNightstand(3.0, back2 - 0.6));
-    group.add(buildSoftRug(-1.4, cz - 0.2, '#7c6f63'));
+    colliders.push({ minX: 2.55, maxX: 4.65, minZ: back2 - 2.75, maxZ: back2 - 0.45 });
+    group.add(buildNightstand(2.3, back2 - 0.6));
+    group.add(buildSoftRug(0.4, cz + 0.3, '#7c6f63'));
 
     const bLamp = new THREE.PointLight('#ffe3b8', 14, 9, 2);
     bLamp.position.set(0, ROOM.h - 0.35, cz);
     bLamp.castShadow = true;
     group.add(bLamp);
-    const fixture = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22, 0.26, 0.12, 24),
-      new THREE.MeshStandardMaterial({ color: '#fff6e2', emissive: '#ffdca0', emissiveIntensity: 0.6, roughness: 0.6 })
-    );
-    fixture.position.set(0, ROOM.h - 0.08, cz);
-    group.add(fixture);
+    group.add(buildCeilingFixture(0, cz));
+
+    if (hasBath) buildBathroom(group, colliders, walls, wallMat, back2);
   }
 
   // ---- API ---------------------------------------------------------------
@@ -359,6 +367,84 @@ function buildSoftRug(x, z, color) {
   return rug;
 }
 
+function buildCeilingFixture(x, z) {
+  const fixture = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.26, 0.12, 24),
+    new THREE.MeshStandardMaterial({ color: '#fff6e2', emissive: '#ffdca0', emissiveIntensity: 0.6, roughness: 0.6 })
+  );
+  fixture.position.set(x, ROOM.h - 0.08, z);
+  return fixture;
+}
+
+// ---- En-suite bathroom (suite layout): far-left corner of the bedroom -----
+function buildBathroom(group, colliders, walls, wallMat, back2) {
+  const x0 = -ROOM.w / 2, x1 = -1.8;        // x span
+  const z1 = back2, z0 = back2 - 3.2;       // z span (against the far wall)
+  const midX = (x0 + x1) / 2, midZ = (z0 + z1) / 2;
+  const t = ROOM.wall;
+
+  // Tiled floor.
+  const tile = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0),
+    new THREE.MeshStandardMaterial({ color: '#cfd6da', roughness: 0.35, metalness: 0.05 }));
+  tile.rotation.x = -Math.PI / 2; tile.position.set(midX, 0.02, midZ); tile.receiveShadow = true;
+  group.add(tile);
+
+  // Partition A: vertical wall at x = x1 (solid).
+  const wA = makeWallPanel(z1 - z0, ROOM.h, null, wallMat);
+  wA.position.set(x1, ROOM.h / 2, midZ); wA.rotation.y = Math.PI / 2;
+  group.add(wA);
+  colliders.push({ minX: x1 - t / 2, maxX: x1 + t / 2, minZ: z0, maxZ: z1 });
+  walls.push({ x1, z1: z0, x2: x1, z2: z1 });
+
+  // Partition B: horizontal wall at z = z0 with the bathroom door (centred).
+  const bdx = midX, bdw = 1.0;
+  const wB = makeWallPanel(x1 - x0, ROOM.h, { x: bdx - midX, y: -ROOM.h / 2 + 1.025, w: bdw, h: 2.05 }, wallMat);
+  wB.position.set(midX, ROOM.h / 2, z0);
+  group.add(wB);
+  group.add(buildDoor({ x: bdx, y: -ROOM.h / 2 + 1.025, w: bdw, h: 2.05 }, z0, -0.5));
+  const bl = bdx - bdw / 2, br = bdx + bdw / 2;
+  colliders.push({ minX: x0, maxX: bl, minZ: z0 - t / 2, maxZ: z0 + t / 2 });
+  colliders.push({ minX: br, maxX: x1, minZ: z0 - t / 2, maxZ: z0 + t / 2 });
+  walls.push({ x1: x0, z: z0, x2: bl }, { x1: br, z: z0, x2: x1 });
+
+  // Fixtures along the far/left walls.
+  group.add(buildToilet(x0 + 0.55, z1 - 0.55));
+  group.add(buildSink(x0 + 0.45, midZ + 0.1));
+  colliders.push({ minX: x0, maxX: x0 + 1.0, minZ: z1 - 1.05, maxZ: z1 });
+
+  const light = new THREE.PointLight('#eaf2ff', 7, 6, 2);
+  light.position.set(midX, ROOM.h - 0.3, midZ);
+  group.add(light);
+  group.add(buildCeilingFixture(midX, midZ));
+}
+
+function buildToilet(x, z) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: '#f4f6f7', roughness: 0.3 });
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.4, 20), mat);
+  bowl.position.y = 0.2; bowl.castShadow = true; g.add(bowl);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 20), mat);
+  lid.position.y = 0.42; g.add(lid);
+  const tank = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.4, 0.18), mat);
+  tank.position.set(0, 0.6, -0.18); g.add(tank);
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function buildSink(x, z) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: '#f4f6f7', roughness: 0.3 });
+  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.78, 16), mat);
+  pedestal.position.y = 0.39; g.add(pedestal);
+  const basin = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.34), mat);
+  basin.position.y = 0.82; basin.castShadow = true; g.add(basin);
+  const mirror = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.5),
+    new THREE.MeshStandardMaterial({ color: '#9fb8c8', roughness: 0.1, metalness: 0.6 }));
+  mirror.rotation.y = Math.PI / 2; mirror.position.set(-0.08, 1.45, 0); g.add(mirror);
+  g.position.set(x, 0, z);
+  return g;
+}
+
 // Window frame + glass inside the right-wall opening.
 function buildWindow(win) {
   const g = new THREE.Group();
@@ -428,6 +514,8 @@ function buildExterior() {
   tree(9, -3, 1.1);
   tree(11, 2.5, 1.4);
   tree(13, -1, 1.0);
+  tree(10, 6, 1.2);     // visible through the bedroom window
+  tree(12.5, 4.5, 1.0);
 
   const bldg = new THREE.Mesh(
     new THREE.BoxGeometry(6, 9, 6),

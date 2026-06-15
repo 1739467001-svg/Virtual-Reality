@@ -36,14 +36,20 @@ assert.ok(Array.isArray(room.colliders) && room.floorplan && room.floorplan.ext,
 room.setWallColor('#b9c7cf');
 for (const t of room.themes) room.setFloorTheme(t);
 
-// Apartment (multi-room) layout builds without error and adds a divided plan.
-const aptScene = new THREE.Scene();
-const apt = buildRoom(aptScene, 'apartment');
-assert.strictEqual(apt.layout, 'apartment', 'apartment layout flagged');
-assert.ok(apt.floorplan.ext.maxZ > room.floorplan.ext.maxZ, 'apartment extends past the studio');
-assert.ok(apt.colliders.length >= 3, 'apartment adds interior-wall + bed obstacles');
-assert.ok(apt.floorplan.walls.length >= 2, 'apartment has interior wall segments (with door gap)');
-for (const c of apt.colliders) assert.ok(c.maxX > c.minX && c.maxZ > c.minZ, 'apartment obstacle box valid');
+// Multi-room layouts build without error and add a divided plan.
+for (const layout of ['oneBed', 'suite']) {
+  const apt = buildRoom(new THREE.Scene(), layout);
+  assert.strictEqual(apt.layout, layout, `${layout} layout flagged`);
+  assert.ok(apt.floorplan.ext.maxZ > room.floorplan.ext.maxZ, `${layout} extends past the studio`);
+  assert.ok(apt.colliders.length >= 3, `${layout} adds interior-wall + furniture obstacles`);
+  assert.ok(apt.floorplan.walls.length >= 2, `${layout} has interior wall segments`);
+  for (const c of apt.colliders) assert.ok(c.maxX > c.minX && c.maxZ > c.minZ, `${layout} obstacle box valid`);
+}
+// The suite adds the bathroom partition (more obstacles + wall segments than oneBed).
+const oneBed = buildRoom(new THREE.Scene(), 'oneBed');
+const suite = buildRoom(new THREE.Scene(), 'suite');
+assert.ok(suite.colliders.length > oneBed.colliders.length, 'suite adds bathroom obstacles');
+assert.ok(suite.floorplan.walls.length > oneBed.floorplan.walls.length, 'suite adds bathroom walls');
 
 const lights = buildLights(scene);
 for (const t of lights.times) lights.setTimeOfDay(t);
