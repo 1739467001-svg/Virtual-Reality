@@ -4,14 +4,30 @@
 import * as THREE from 'three';
 import { makeWoodTexture, makeWallTexture, makePictureTexture, makeFabricTexture, makeClockTexture } from './textures.js';
 
+// The living room (dimensions unchanged across layouts; furniture & details
+// are all authored against this box centred on the origin).
 export const ROOM = { w: 10, d: 8, h: 3.2, wall: 0.15 };
 
-// Keep the player a little away from the surfaces.
+// Floor-plan layouts. "studio" = the single living room. "apartment" appends a
+// bedroom in +z, turning the old entrance door into the inter-room doorway.
+const BED_D = 6;                       // bedroom depth, appended past z = +d/2
+export function readLayout() {
+  try {
+    if (globalThis.__VH_LAYOUT__) return globalThis.__VH_LAYOUT__;
+    if (globalThis.localStorage && localStorage.getItem('vh_layout') === 'apartment') return 'apartment';
+  } catch { /* no localStorage (e.g. Node tests) */ }
+  return 'studio';
+}
+export const LAYOUT = readLayout();
+const zMax = (layout) => (layout === 'apartment' ? ROOM.d / 2 + BED_D : ROOM.d / 2);
+
+// Keep the player a little away from the surfaces. maxZ extends into the
+// bedroom when the apartment layout is active.
 export const BOUNDS = {
   minX: -ROOM.w / 2 + 0.4,
   maxX: ROOM.w / 2 - 0.4,
   minZ: -ROOM.d / 2 + 0.4,
-  maxZ: ROOM.d / 2 - 0.4,
+  maxZ: zMax(LAYOUT) - 0.4,
 };
 
 const WOOD_THEMES = {
@@ -21,9 +37,11 @@ const WOOD_THEMES = {
   grey: '#8d8d8d',
 };
 
-export function buildRoom(scene) {
+export function buildRoom(scene, layout = LAYOUT) {
   const group = new THREE.Group();
   scene.add(group);
+  const apartment = layout === 'apartment';
+  const colliders = [];   // static obstacles the player collides with (interior walls, bed)
 
   // ---- Floor -------------------------------------------------------------
   const woodTex = makeWoodTexture({ base: WOOD_THEMES.oak });
@@ -92,6 +110,75 @@ export function buildRoom(scene) {
   group.add(buildCurtains(win));
   group.add(buildClock());
 
+  // ---- Apartment: append a bedroom past the (now interior) front wall ----
+  // Living-room geometry above is untouched; the existing door opening at
+  // z = +d/2 becomes the doorway between the two rooms.
+  const divZ = ROOM.d / 2;              // world z of the shared/interior wall
+  const back2 = divZ + BED_D;           // world z of the bedroom's far wall
+  const ext = apartment
+    ? { minX: -ROOM.w / 2, maxX: ROOM.w / 2, minZ: -ROOM.d / 2, maxZ: back2 }
+    : { minX: -ROOM.w / 2, maxX: ROOM.w / 2, minZ: -ROOM.d / 2, maxZ: ROOM.d / 2 };
+  const walls = [];                     // interior wall line segments for the minimap
+
+  if (apartment) {
+    const cz = (divZ + back2) / 2;      // bedroom centre on z
+
+    // Floor + ceiling covering the bedroom.
+    const bFloor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, BED_D), floorMat);
+    bFloor.rotation.x = -Math.PI / 2; bFloor.position.z = cz; bFloor.receiveShadow = true;
+    group.add(bFloor);
+    const bCeil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, BED_D), ceilMat);
+    bCeil.rotation.x = Math.PI / 2; bCeil.position.set(0, ROOM.h, cz); bCeil.receiveShadow = true;
+    group.add(bCeil);
+
+    // Bedroom side walls (no openings).
+    const bLeft = makeWallPanel(BED_D, ROOM.h, null, wallMat);
+    bLeft.position.set(-ROOM.w / 2, ROOM.h / 2, cz); bLeft.rotation.y = Math.PI / 2;
+    group.add(bLeft);
+    const bRight = makeWallPanel(BED_D, ROOM.h, null, wallMat);
+    bRight.position.set(ROOM.w / 2, ROOM.h / 2, cz); bRight.rotation.y = -Math.PI / 2;
+    group.add(bRight);
+
+    // Bedroom far wall with the apartment's outer entrance door (world x = ent.x;
+    // the panel is rotated 180° so its hole's local x is negated, as on the
+    // living-room front wall).
+    const ent = { x: -2.2, y: -ROOM.h / 2 + 1.05, w: 1.15, h: 2.1 };
+    const farWall = makeWallPanel(ROOM.w, ROOM.h, { ...ent, x: -ent.x }, wallMat);
+    farWall.position.set(0, ROOM.h / 2, back2); farWall.rotation.y = Math.PI;
+    group.add(farWall);
+    group.add(buildDoor(ent, back2, -0.16));
+
+    // The shared front wall now divides two rooms: block it except the doorway.
+    const dl = door.x - door.w / 2, dr = door.x + door.w / 2;
+    const seg = (minX, maxX) => colliders.push({
+      minX, maxX, minZ: divZ - ROOM.wall / 2, maxZ: divZ + ROOM.wall / 2,
+    });
+    seg(-ROOM.w / 2, dl);
+    seg(dr, ROOM.w / 2);
+    walls.push({ x1: -ROOM.w / 2, z: divZ, x2: dl }, { x1: dr, z: divZ, x2: ROOM.w / 2 });
+
+    // Furnish + light the bedroom. Bed sits in the far corner, headboard to the
+    // back wall and clear of the entrance door (at x = ent.x = -2.2).
+    const bed = buildBed();
+    bed.position.set(1.6, 0, back2 - 1.2);
+    bed.rotation.y = Math.PI;             // headboard faces the far wall (+z)
+    group.add(bed);
+    colliders.push({ minX: 0.5, maxX: 2.7, minZ: back2 - 2.3, maxZ: back2 - 0.15 });
+    group.add(buildNightstand(3.0, back2 - 0.6));
+    group.add(buildSoftRug(-1.4, cz - 0.2, '#7c6f63'));
+
+    const bLamp = new THREE.PointLight('#ffe3b8', 14, 9, 2);
+    bLamp.position.set(0, ROOM.h - 0.35, cz);
+    bLamp.castShadow = true;
+    group.add(bLamp);
+    const fixture = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.26, 0.12, 24),
+      new THREE.MeshStandardMaterial({ color: '#fff6e2', emissive: '#ffdca0', emissiveIntensity: 0.6, roughness: 0.6 })
+    );
+    fixture.position.set(0, ROOM.h - 0.08, cz);
+    group.add(fixture);
+  }
+
   // ---- API ---------------------------------------------------------------
   function setWallColor(hex) {
     wallMat.color.set(hex);
@@ -104,7 +191,10 @@ export function buildRoom(scene) {
     floorMat.needsUpdate = true;
   }
 
-  return { group, setWallColor, setFloorTheme, themes: Object.keys(WOOD_THEMES) };
+  return {
+    group, setWallColor, setFloorTheme, themes: Object.keys(WOOD_THEMES),
+    layout, colliders, floorplan: { ext, walls },
+  };
 }
 
 // A flat wall panel in its local XY plane (normal +z), centred on origin, with
@@ -181,14 +271,13 @@ function makePicture(kind, pos, ry) {
   return g;
 }
 
-// A door slab sitting slightly ajar inside the front-wall opening.
-function buildDoor(door) {
+// A door slab sitting slightly ajar inside a wall opening at world z = fz.
+function buildDoor(door, fz = ROOM.d / 2, hingeAngle = -0.6) {
   const g = new THREE.Group();
   const frameMat = new THREE.MeshStandardMaterial({ color: '#cfc8ba', roughness: 0.7 });
   const slabMat = new THREE.MeshStandardMaterial({ color: '#8a5a2b', roughness: 0.6 });
 
   // Frame.
-  const fz = ROOM.d / 2;
   const sideH = door.h + 0.06;
   const mkFrame = (w, h, x, y) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.18), frameMat);
@@ -214,9 +303,60 @@ function buildDoor(door) {
   );
   handle.position.set(door.w - 0.1, door.h / 2, 0.05);
   hinge.add(handle);
-  hinge.rotation.y = -0.6;
+  hinge.rotation.y = hingeAngle;
   g.add(hinge);
   return g;
+}
+
+// ---- Bedroom furnishings (apartment layout) ------------------------------
+function buildBed() {
+  const g = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({ color: '#6b4a32', roughness: 0.7 });
+  const sheetMat = new THREE.MeshStandardMaterial({ color: '#eae4d8', roughness: 0.95 });
+  const duvetMat = new THREE.MeshStandardMaterial({ color: '#5b7a8c', roughness: 0.9 });
+  const pillowMat = new THREE.MeshStandardMaterial({ color: '#f5f1e8', roughness: 0.95 });
+  const W = 1.8, L = 2.1;            // double bed footprint (x = width, z = length)
+
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 0.28, L + 0.14), woodMat);
+  frame.position.set(0, 0.18, 0); frame.castShadow = true; frame.receiveShadow = true;
+  g.add(frame);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 0.8, 0.12), woodMat);
+  head.position.set(0, 0.5, -L / 2 - 0.01); head.castShadow = true;
+  g.add(head);
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(W, 0.22, L), sheetMat);
+  mattress.position.set(0, 0.43, 0); mattress.castShadow = true; mattress.receiveShadow = true;
+  g.add(mattress);
+  const duvet = new THREE.Mesh(new THREE.BoxGeometry(W + 0.04, 0.1, L * 0.62), duvetMat);
+  duvet.position.set(0, 0.55, L * 0.18); duvet.castShadow = true;
+  g.add(duvet);
+  for (const sx of [-1, 1]) {
+    const pillow = new THREE.Mesh(new THREE.BoxGeometry(W * 0.42, 0.12, 0.42), pillowMat);
+    pillow.position.set(sx * W * 0.24, 0.6, -L / 2 + 0.34); pillow.castShadow = true;
+    g.add(pillow);
+  }
+  return g;
+}
+
+function buildNightstand(x, z) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: '#6b4a32', roughness: 0.7 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.42), mat);
+  body.position.y = 0.25; body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+  const lampMat = new THREE.MeshStandardMaterial({ color: '#d9c08a', emissive: '#ffcf86', emissiveIntensity: 0.5, roughness: 0.6 });
+  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.2, 20), lampMat);
+  shade.position.y = 0.72; g.add(shade);
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function buildSoftRug(x, z, color) {
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 1 });
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.8), mat);
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(x, 0.012, z);
+  rug.receiveShadow = true;
+  return rug;
 }
 
 // Window frame + glass inside the right-wall opening.

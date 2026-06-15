@@ -32,8 +32,18 @@ const scene = new THREE.Scene();
 const room = buildRoom(scene);
 assert.ok(ROOM.w > 0 && ROOM.h > 0, 'room dimensions set');
 assert.ok(BOUNDS.maxX > BOUNDS.minX, 'bounds valid');
+assert.ok(Array.isArray(room.colliders) && room.floorplan && room.floorplan.ext, 'room exposes colliders + floorplan');
 room.setWallColor('#b9c7cf');
 for (const t of room.themes) room.setFloorTheme(t);
+
+// Apartment (multi-room) layout builds without error and adds a divided plan.
+const aptScene = new THREE.Scene();
+const apt = buildRoom(aptScene, 'apartment');
+assert.strictEqual(apt.layout, 'apartment', 'apartment layout flagged');
+assert.ok(apt.floorplan.ext.maxZ > room.floorplan.ext.maxZ, 'apartment extends past the studio');
+assert.ok(apt.colliders.length >= 3, 'apartment adds interior-wall + bed obstacles');
+assert.ok(apt.floorplan.walls.length >= 2, 'apartment has interior wall segments (with door gap)');
+for (const c of apt.colliders) assert.ok(c.maxX > c.minX && c.maxZ > c.minZ, 'apartment obstacle box valid');
 
 const lights = buildLights(scene);
 for (const t of lights.times) lights.setTimeOfDay(t);

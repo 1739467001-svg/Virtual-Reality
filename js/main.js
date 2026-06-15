@@ -7,7 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-import { buildRoom, ROOM } from './room.js';
+import { buildRoom, ROOM, LAYOUT } from './room.js';
 import { buildLights } from './lights.js';
 import { buildFurniture } from './furniture.js';
 import { Player } from './player.js';
@@ -43,7 +43,8 @@ const lights = buildLights(scene, envTexture);
 const furniture = buildFurniture(scene);
 
 const player = new Player(camera, renderer.domElement, {
-  getColliders: () => furniture.getColliders(),
+  // Furniture footprints plus static obstacles (interior walls, bed).
+  getColliders: () => furniture.getColliders().concat(room.colliders),
 });
 
 // ---- Furniture mover (pick up & reposition) ------------------------------
@@ -58,10 +59,24 @@ setupUI({ room, lights, furniture, player, mover });
 
 // ---- Minimap HUD ---------------------------------------------------------
 const minimap = createMinimap(document.getElementById('minimap'), {
-  w: ROOM.w, d: ROOM.d,
+  ext: room.floorplan.ext,
+  walls: room.floorplan.walls,
   getColliders: () => furniture.getColliders(),
+  getObstacles: () => room.colliders,
   getPose: () => ({ x: camera.position.x, z: camera.position.z, yaw: player.yaw }),
 });
+
+// ---- Floor-plan (户型) toggle: persists choice and reloads --------------
+const layoutBtn = document.getElementById('btn-layout');
+if (layoutBtn) {
+  const label = layoutBtn.querySelector('.val');
+  if (label) label.textContent = LAYOUT === 'apartment' ? '两居 2-room' : '单间 Studio';
+  layoutBtn.addEventListener('click', () => {
+    const next = LAYOUT === 'apartment' ? 'studio' : 'apartment';
+    try { localStorage.setItem('vh_layout', next); } catch { /* ignore */ }
+    location.reload();
+  });
+}
 
 // ---- WebXR button --------------------------------------------------------
 document.body.appendChild(VRButton.createButton(renderer));
