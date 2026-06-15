@@ -9,6 +9,8 @@ between day / evening / night. Built with [Three.js](https://threejs.org) and
 **no build step** — it's plain HTML + ES modules loaded via an import map, so
 it runs from any static host (or opened straight as `index.html`).
 
+🔗 **在线体验 Live demo: <https://1739467001-svg.github.io/Virtual-Reality/>**
+
 ## ✨ 功能 Features
 
 - 🚶 **第一人称漫游** — WASD / 方向键移动，鼠标转头，`Shift` 快走，带碰撞检测（不会穿墙、不会穿过家具）。
@@ -35,6 +37,9 @@ it runs from any static host (or opened straight as `index.html`).
 | 释放鼠标 Release cursor | `Esc` |
 | 切换灯光 / 家具 / 装修 | 右上角控制面板 Panel (top-right) |
 | 移动家具 Move furniture | 面板开启移动模式后，点击拾起 / 放下 |
+| 旋转家具 Rotate | 拾起后 `Q` / `E`，或面板 ⟲ / ⟳ 按钮 |
+| 删除家具 Delete | 拾起后 `Delete` / `Backspace` / `X` |
+| 拍照导出 Snapshot | 面板「📸 拍照」导出当前视角 PNG |
 
 ## 🚀 运行 Run
 
@@ -54,8 +59,12 @@ npm run serve
 
 ### 部署到 GitHub Pages
 
-仓库是纯静态的，在仓库 **Settings → Pages** 选择该分支、根目录 `/`，
-保存后即可通过 `https://<user>.github.io/<repo>/` 访问（WebXR 需要 HTTPS，Pages 默认满足）。
+仓库已配置 **GitHub Actions 自动部署**（`.github/workflows/pages.yml`）：每次推送到
+`main` 分支即把仓库根目录发布到 Pages，无需手动构建。本项目已上线于
+<https://1739467001-svg.github.io/Virtual-Reality/>（WebXR 需要 HTTPS，Pages 默认满足）。
+
+> 想自行部署到你自己的仓库：在 **Settings → Pages → Build and deployment** 把 Source
+> 选为 **GitHub Actions** 即可；或因为是纯静态站点，也可直接选某个分支 + 根目录 `/`。
 
 ## ✅ 测试 Test
 
@@ -65,7 +74,7 @@ npm run serve
 ```bash
 npm install   # 安装 three（仅测试用，浏览器端走 CDN）
 npm test
-# ✅ smoke test passed — 158 meshes, 6 colliders
+# ✅ smoke test passed — 215 meshes, 6 colliders
 ```
 
 ## 🗂️ 结构 Structure
@@ -74,14 +83,17 @@ npm test
 index.html              页面骨架 + import map + 控制面板 DOM
 css/style.css           UI 样式（玻璃拟态面板、摇杆、进入引导页）
 js/
-  main.js               入口：渲染器 / 场景 / 循环 / WebXR / 家具移动交互
+  main.js               入口：渲染器 / 场景 / 循环 / WebXR / 后期管线 / 家具移动旋转 / 拍照
   room.js               房屋外壳：地板、天花、带门窗洞口的墙、踢脚线、室外景观
   lights.js             灯光：日光（昼昏夜）、吸顶灯、落地灯及其发光灯罩
-  furniture.js          家具：沙发 / 扶手椅 / 茶几 / 电视柜 / 书架 / 绿植 + 换装与碰撞体
+  furniture.js          家具：程序化家具 + 真实 glTF 模型 + 换装 / 碰撞 / 增删 / 布置序列化
   player.js             第一人称控制：指针锁定、WASD、触屏、逐轴滑动碰撞
   ui.js                 控制面板与触屏摇杆的事件绑定
+  minimap.js            左上角 2D 小地图 HUD：实时位置朝向与家具占位
   textures.js           纯 Canvas 程序化纹理（木地板 / 地毯 / 墙面 / 挂画）
+assets/models/          真实 glTF 家具模型（真皮沙发 / 锦缎单椅，Khronos CC 许可）
 test/smoke.mjs          Node 冒烟测试（构建场景并跑一遍所有交互逻辑）
+.github/workflows/      GitHub Actions：推送 main 自动部署到 Pages
 ```
 
 > 浏览器端通过 import map 从 CDN（jsDelivr）加载 Three.js r160；`npm install`
@@ -89,10 +101,15 @@ test/smoke.mjs          Node 冒烟测试（构建场景并跑一遍所有交互
 
 ## 🛠️ 技术说明 Tech notes
 
-- **Three.js r160**，`WebGLRenderer` 开启阴影 + ACES Filmic 色调映射，物理光照单位。
-- 所有几何体与纹理均为**程序化生成**（盒子 / 圆柱 / 圆锥 + Canvas 纹理），不依赖任何美术资源。
-- 墙体通过“开洞”算法用四段拼出门窗洞口；移动家具用射线投射到地面平面实现。
+- **Three.js r160**，`WebGLRenderer` 开启阴影 + ACES Filmic 色调映射，物理光照单位；
+  环境光照（IBL）用 `RoomEnvironment` 经 PMREM 生成，玻璃 / 金属 / 屏幕都有真实反射。
+- 房屋本体与多数家具为**程序化生成**（盒子 / 圆柱 / 圆锥 + Canvas 纹理），无需美术资源；
+  少量真实家具以 **glTF** 模型按需加载（随仓库本地内置，避免跨域与外链失效）。
+- 可开关的**后期管线**（`EffectComposer`：UnrealBloom 辉光 + SMAA 抗锯齿 + OutputPass），
+  进入 VR 时自动旁路，直接走 WebXR 渲染路径。
+- 墙体通过“开洞”算法用四段拼出门窗洞口；移动 / 旋转家具用射线投射到地面平面实现。
 - 碰撞采用 AABB 逐轴解算，撞墙会自然滑动而不是卡住。
+- 整套布置（家具摆位 / 朝向 / 配色 / 装修 / 灯光 / 昼夜）序列化进 URL `#` 片段，可保存分享。
 
 ---
 
