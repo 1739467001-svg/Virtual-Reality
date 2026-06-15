@@ -65,12 +65,15 @@ assert.ok(moved, 'collider follows moved furniture');
 
 // Save / restore round-trip (the share-by-URL feature).
 furniture.cycleSofaStyle(); furniture.cycleTable();
+sofa.holder.rotation.y = 1.23;
 const saved = furniture.getState();
 sofa.holder.position.set(-2.5, 0, 2.0);
+sofa.holder.rotation.y = 0;
 furniture.cycleSofaStyle(); furniture.cycleTable();
 furniture.applyState(saved);
 assert.ok(Math.abs(sofa.holder.position.x - saved.p.s[0]) < 0.001 &&
   Math.abs(sofa.holder.position.z - saved.p.s[1]) < 0.001, 'applyState restores position');
+assert.ok(Math.abs(sofa.holder.rotation.y - 1.23) < 0.01, 'applyState restores rotation');
 assert.strictEqual(furniture.getState().ss, saved.ss, 'applyState restores sofa style');
 assert.strictEqual(furniture.getState().tb, saved.tb, 'applyState restores table style');
 
@@ -85,9 +88,14 @@ assert.strictEqual(furniture.getMovable().length, before + furniture.catalogType
 const added = furniture.getMovable().find((p) => p.removable);
 assert.ok(furniture.removeItem(added), 'removeItem works');
 
-// Extras survive a save / restore round-trip.
+// addItem honours an explicit rotation (used to restore shared layouts).
+const rotated = furniture.addItem('stool', 1, 1, 0.77);
+assert.ok(Math.abs(rotated.holder.rotation.y - 0.77) < 0.001, 'addItem applies rotation');
+
+// Extras survive a save / restore round-trip (incl. rotation).
 const withExtras = furniture.getState();
 assert.ok(withExtras.ex.length >= 1, 'extras serialised');
+assert.ok(withExtras.ex.every((e) => typeof e.r === 'number'), 'extras carry rotation');
 furniture.applyState({ ...withExtras, ex: [] });
 assert.strictEqual(furniture.getState().ex.length, 0, 'applyState clears extras');
 furniture.applyState(withExtras);

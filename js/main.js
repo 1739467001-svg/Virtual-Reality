@@ -79,6 +79,19 @@ const setHqLabel = () => { hqBtn.classList.toggle('on', hq); hqBtn.querySelector
 setHqLabel();
 hqBtn.addEventListener('click', () => { hq = !hq; setHqLabel(); });
 
+// Snapshot: render a fresh frame, then grab the canvas as a downloadable PNG.
+document.getElementById('btn-shot').addEventListener('click', () => {
+  renderFrame();
+  const link = document.createElement('a');
+  link.download = 'my-room-' + Date.now() + '.png';
+  link.href = renderer.domElement.toDataURL('image/png');
+  link.click();
+});
+
+// Wire the rotate buttons to the furniture mover.
+document.getElementById('btn-rot-l').addEventListener('click', () => mover.rotate(0.26));
+document.getElementById('btn-rot-r').addEventListener('click', () => mover.rotate(-0.26));
+
 // ---- Real glTF furniture models (loaded async, added via the catalogue) ---
 loadModels();
 function loadModels() {
@@ -139,9 +152,13 @@ renderer.setAnimationLoop(() => {
 
   mover.update();
   minimap.update();
-  if (presenting || !hq) renderer.render(scene, camera);
-  else composer.render();
+  renderFrame();
 });
+
+function renderFrame() {
+  if (renderer.xr.isPresenting || !hq) renderer.render(scene, camera);
+  else composer.render();
+}
 
 // --------------------------------------------------------------------------
 // Furniture mover: raycast from screen centre, click to pick up / drop, the
@@ -173,6 +190,11 @@ function createMover() {
         selected.holder.position.z = clamp(hitPoint.z, FBOUNDS.minZ + hd, FBOUNDS.maxZ - hd);
       }
     },
+    // Rotate the held piece (on-screen buttons + Q/E keys).
+    rotate(delta) {
+      if (!active || !selected) { announce('先在移动模式下拾起家具再旋转 · Pick up a piece first'); return; }
+      selected.holder.rotation.y += delta;
+    },
   };
 
   function pick() {
@@ -194,13 +216,14 @@ function createMover() {
     announce(active ? '移动模式：点击拾起 · 选中后按 Delete 删除 · Click to pick up, Delete to remove' : '');
   }
 
-  // Delete the selected piece (catalogue items only).
+  // Delete / rotate the selected piece via the keyboard.
   addEventListener('keydown', (e) => {
     if (!active || !selected) return;
     if (e.code === 'Delete' || e.code === 'Backspace' || e.code === 'KeyX') {
       if (furniture.removeItem(selected)) { selected = null; announce('已删除 · Removed'); }
       else announce('该家具不可删除 · This piece can\'t be removed');
-    }
+    } else if (e.code === 'KeyQ') selected.holder.rotation.y += 0.18;
+    else if (e.code === 'KeyE') selected.holder.rotation.y -= 0.18;
   });
 
   renderer.domElement.addEventListener('pointerdown', () => {

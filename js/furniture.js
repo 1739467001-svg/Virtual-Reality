@@ -125,12 +125,12 @@ export function buildFurniture(scene) {
 
   // ---- Add / remove catalogue items -------------------------------------
   let nextId = 1;
-  function addItem(type, x = 0, z = 0) {
+  function addItem(type, x = 0, z = 0, rot) {
     const made = buildExtra(type);
     if (!made) return null;
     const holder = new THREE.Group();
     holder.position.set(x, 0, z);
-    holder.rotation.y = Math.random() * Math.PI * 2;
+    holder.rotation.y = typeof rot === 'number' ? rot : Math.random() * Math.PI * 2;
     holder.add(enableShadows(made.object));
     group.add(holder);
     const piece = { name: `${type}-${nextId++}`, type, holder, foot: made.foot, movable: true, removable: true };
@@ -171,19 +171,21 @@ export function buildFurniture(scene) {
     },
     // ---- Serialisable layout (for save / share via URL) ----
     getState() {
+      const r2 = (v) => Math.round(v * 100) / 100;
       const KEY = { Sofa: 's', Armchair: 'a', 'Coffee table': 't', Plant: 'pl' };
       const p = {};
       for (const pc of pieces) {
         const k = KEY[pc.name];
         if (!k || !pc.holder) continue;
-        p[k] = [Math.round(pc.holder.position.x * 100) / 100, Math.round(pc.holder.position.z * 100) / 100];
+        p[k] = [r2(pc.holder.position.x), r2(pc.holder.position.z), r2(pc.holder.rotation.y)];
       }
       return {
         sc: state.sofaColor, ss: state.sofaStyle, tb: state.table, rg: state.rug,
         rv: state.rugVisible ? 1 : 0, p,
         ex: pieces.filter((pc) => pc.type).map((pc) => ({
           t: pc.type,
-          p: [Math.round(pc.holder.position.x * 100) / 100, Math.round(pc.holder.position.z * 100) / 100],
+          p: [r2(pc.holder.position.x), r2(pc.holder.position.z)],
+          r: r2(pc.holder.rotation.y),
         })),
       };
     },
@@ -202,11 +204,12 @@ export function buildFurniture(scene) {
         if (!k || !pc.holder || !Array.isArray(s.p[k])) continue;
         pc.holder.position.x = s.p[k][0];
         pc.holder.position.z = s.p[k][1];
+        if (typeof s.p[k][2] === 'number') pc.holder.rotation.y = s.p[k][2];
       }
       // Recreate dynamically-added items.
       for (const pc of pieces.filter((p) => p.removable)) removeItem(pc);
       if (Array.isArray(s.ex)) for (const it of s.ex) {
-        if (it && it.t && Array.isArray(it.p)) addItem(it.t, it.p[0], it.p[1]);
+        if (it && it.t && Array.isArray(it.p)) addItem(it.t, it.p[0], it.p[1], it.r);
       }
     },
   };
