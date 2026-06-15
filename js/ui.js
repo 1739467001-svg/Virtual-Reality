@@ -10,8 +10,10 @@ const WALL_COLORS = [
 ];
 const FLOOR_LABELS = { oak: '橡木 Oak', walnut: '胡桃 Walnut', ash: '白蜡 Ash', grey: '灰木 Grey' };
 const TIME_LABELS = { day: '☀️ 白天 Day', evening: '🌇 黄昏 Evening', night: '🌙 夜晚 Night' };
+const WEATHER_LABELS = { clear: '☀️ 晴 Clear', rain: '🌧️ 雨 Rain', snow: '❄️ 雪 Snow' };
+const SEASON_LABELS = { spring: '🌸 春 Spring', summer: '🌿 夏 Summer', autumn: '🍂 秋 Autumn', winter: '⛄ 冬 Winter' };
 
-export function setupUI({ room, lights, furniture, player, mover }) {
+export function setupUI({ room, lights, furniture, player, mover, environment }) {
   const $ = (id) => document.getElementById(id);
   const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   const hint = $('hint');
@@ -46,16 +48,29 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   const tableBtn = $('btn-table'), rugToggle = $('btn-rug-toggle');
   const wallBtn = $('btn-wall'), floorBtn = $('btn-floor');
   const picBtn = $('btn-pic'), kitchenBtn = $('btn-kitchen');
+  const weatherBtn = $('btn-weather'), seasonBtn = $('btn-season');
 
   // ---- Indexed finishes (apply functions double as cycle + restore) ------
-  const idx = { wall: 0, floor: 0, time: 0, pic: 0, kitchen: 0 };
+  const idx = { wall: 0, floor: 0, time: 0, pic: 0, kitchen: 0, weather: 0, season: 0 };
   const wrap = (v, n) => ((Math.trunc(v) % n) + n) % n;
 
   function applyTime(i) {
-    idx.time = wrap(i, lights.times.length);
-    const t = lights.times[idx.time];
-    lights.setTimeOfDay(t);
+    idx.time = wrap(i, environment.times.length);
+    const t = environment.times[idx.time];
+    environment.setTime(t);
     timeBtn.querySelector('.val').textContent = TIME_LABELS[t];
+  }
+  function applyWeather(i) {
+    idx.weather = wrap(i, environment.weathers.length);
+    const w = environment.weathers[idx.weather];
+    environment.setWeather(w);
+    weatherBtn.querySelector('.val').textContent = WEATHER_LABELS[w] || w;
+  }
+  function applySeason(i) {
+    idx.season = wrap(i, environment.seasons.length);
+    const s = environment.seasons[idx.season];
+    environment.setSeason(s);
+    seasonBtn.querySelector('.val').textContent = SEASON_LABELS[s] || s;
   }
   function applyWall(i) {
     idx.wall = wrap(i, WALL_COLORS.length);
@@ -83,8 +98,10 @@ export function setupUI({ room, lights, furniture, player, mover }) {
     setBtn(rugToggle, furniture.state.rugVisible);
   }
 
-  // Initial labels.
+  // Initial labels (match the environment's default state).
   applyTime(0); applyWall(0); applyFloor(0); applyPicture(0); applyKitchen(0);
+  applyWeather(environment.weathers.indexOf(environment.state.weather));
+  applySeason(environment.seasons.indexOf(environment.state.season));
   setBtn(ceiling, lights.state.ceiling);
   setBtn(lamp, lights.state.lamp);
   refreshFurnitureLabels();
@@ -115,6 +132,8 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   floorBtn.addEventListener('click', () => applyFloor(idx.floor + 1));
   picBtn.addEventListener('click', () => applyPicture(idx.pic + 1));
   kitchenBtn.addEventListener('click', () => applyKitchen(idx.kitchen + 1));
+  weatherBtn.addEventListener('click', () => applyWeather(idx.weather + 1));
+  seasonBtn.addEventListener('click', () => applySeason(idx.season + 1));
 
   // ---- Add furniture from the catalogue ---------------------------------
   let addIdx = 0;
@@ -150,6 +169,7 @@ export function setupUI({ room, lights, furniture, player, mover }) {
   const gather = () => Object.assign(
     {
       v: 1, wl: idx.wall, fl: idx.floor, tm: idx.time, pk: idx.pic, kt: idx.kitchen,
+      we: idx.weather, se: idx.season,
       cl: lights.state.ceiling ? 1 : 0, lp: lights.state.lamp ? 1 : 0,
     },
     furniture.getState()
@@ -162,6 +182,8 @@ export function setupUI({ room, lights, furniture, player, mover }) {
     if (typeof s.fl === 'number') applyFloor(s.fl);
     if (typeof s.pk === 'number') applyPicture(s.pk);
     if (typeof s.kt === 'number') applyKitchen(s.kt);
+    if (typeof s.we === 'number') applyWeather(s.we);
+    if (typeof s.se === 'number') applySeason(s.se);
     if (s.cl !== undefined) { lights.setCeiling(!!s.cl); setBtn(ceiling, !!s.cl); }
     if (s.lp !== undefined) { lights.setLamp(!!s.lp); setBtn(lamp, !!s.lp); }
     furniture.applyState(s);

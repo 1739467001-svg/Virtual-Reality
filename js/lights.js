@@ -85,7 +85,7 @@ export function buildLights(scene, env) {
   return {
     state, setTimeOfDay, setCeiling, setLamp,
     times: Object.keys(TIMES),
-    sun, ambient,
+    sun, ambient, hemi,
   };
 }
 

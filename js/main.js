@@ -13,6 +13,7 @@ import { buildFurniture } from './furniture.js';
 import { Player } from './player.js';
 import { setupUI } from './ui.js';
 import { createMinimap } from './minimap.js';
+import { createEnvironment } from './environment.js';
 
 // ---- Renderer ------------------------------------------------------------
 const canvas = document.getElementById('app');
@@ -42,6 +43,9 @@ const room = buildRoom(scene);
 const lights = buildLights(scene, envTexture);
 const furniture = buildFurniture(scene);
 
+// Outdoor atmosphere: sky, smooth day/night, weather, seasons.
+const environment = createEnvironment({ scene, renderer, lights, room, env: envTexture });
+
 const player = new Player(camera, renderer.domElement, {
   // Furniture footprints plus static obstacles (interior walls, bed).
   getColliders: () => furniture.getColliders().concat(room.colliders),
@@ -55,7 +59,7 @@ const FBOUNDS = {
 const mover = createMover();
 
 // ---- UI ------------------------------------------------------------------
-setupUI({ room, lights, furniture, player, mover });
+setupUI({ room, lights, furniture, player, mover, environment });
 
 // ---- Minimap HUD ---------------------------------------------------------
 const minimap = createMinimap(document.getElementById('minimap'), {
@@ -247,6 +251,7 @@ renderer.setAnimationLoop(() => {
 
   mover.update();
   measure.update();
+  environment.update(dt);
   minimap.update();
   renderFrame();
 });

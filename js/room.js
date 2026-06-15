@@ -53,6 +53,13 @@ const KITCHEN_THEMES = [
   { cab: '#2f5d50', top: '#1f2123' },   // forest green / black
   { cab: '#c7cdd2', top: '#caa46a' },   // light grey / wood
 ];
+// Exterior foliage / ground colours per season (seen through the windows).
+const SEASONS = {
+  spring: { leaf: '#84b54a', ground: '#6fa34d' },
+  summer: { leaf: '#3f7d34', ground: '#6a9a4a' },
+  autumn: { leaf: '#c8732a', ground: '#8f7a3f' },
+  winter: { leaf: '#d6dee2', ground: '#e3e9ec' },
+};
 
 export function buildRoom(scene, layout = LAYOUT) {
   const group = new THREE.Group();
@@ -125,7 +132,8 @@ export function buildRoom(scene, layout = LAYOUT) {
   let picIdx = 0;
 
   // ---- Exterior seen through the window ---------------------------------
-  group.add(buildExterior());
+  const exterior = buildExterior();
+  group.add(exterior);
 
   // ---- Soft furnishings & details ---------------------------------------
   group.add(buildCurtains(win));
@@ -224,6 +232,12 @@ export function buildRoom(scene, layout = LAYOUT) {
   function setKitchen(i) {
     return kitchen.setTheme(i);
   }
+  function setSeason(name) {
+    const s = SEASONS[name] || SEASONS.summer;
+    exterior.userData.leafMat.color.set(s.leaf);
+    exterior.userData.groundMat.color.set(s.ground);
+    return name;
+  }
 
   // Room rectangles (centre + size) for the dimension-annotation tool.
   const rooms = [{ name: '起居室', cx: 0, cz: 0, w: ROOM.w, d: ROOM.d }];
@@ -234,6 +248,7 @@ export function buildRoom(scene, layout = LAYOUT) {
     group, setWallColor, setFloorTheme, themes: Object.keys(WOOD_THEMES),
     setPictures, cyclePictures: () => setPictures(picIdx + 1), pictureSets: PICTURE_SETS,
     setKitchen, cycleKitchen: () => kitchen.setTheme(kitchen.theme + 1), kitchenThemes: KITCHEN_THEMES.length,
+    setSeason, seasons: Object.keys(SEASONS),
     rooms, layout, colliders, floorplan: { ext, walls },
   };
 }
@@ -614,6 +629,8 @@ function buildExterior() {
 
   const trunkMat = new THREE.MeshStandardMaterial({ color: '#6b4423' });
   const leafMat = new THREE.MeshStandardMaterial({ color: '#3f7d34' });
+  g.userData.leafMat = leafMat;
+  g.userData.groundMat = ground.material;
   const tree = (x, z, s) => {
     const t = new THREE.Group();
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.16 * s, 1.2 * s), trunkMat);

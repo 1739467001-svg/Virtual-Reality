@@ -39,6 +39,7 @@ for (const t of room.themes) room.setFloorTheme(t);
 // Swappable wall art + kitchen colour cycle through all variants.
 for (let i = 0; i < room.pictureSets + 1; i++) assert.strictEqual(room.cyclePictures(), (i + 1) % room.pictureSets, 'cyclePictures wraps');
 for (let i = 0; i < room.kitchenThemes + 1; i++) assert.ok(room.cycleKitchen() < room.kitchenThemes, 'cycleKitchen in range');
+for (const s of room.seasons) assert.strictEqual(room.setSeason(s), s, `setSeason(${s})`);
 
 // Multi-room layouts build without error and add a divided plan.
 for (const layout of ['oneBed', 'suite']) {
