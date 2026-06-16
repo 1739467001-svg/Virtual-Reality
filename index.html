@@ -50,7 +50,10 @@
       <div class="sec-title">💡 灯光 Lights</div>
       <button class="btn toggle" id="btn-ceiling"><span class="lbl">吸顶灯 Ceiling</span><span class="state">ON</span></button>
       <button class="btn toggle" id="btn-lamp"><span class="lbl">落地灯 Floor lamp</span><span class="state">ON</span></button>
-      <button class="btn value" id="btn-time"><span class="lbl">时间 Time</span><span class="val">—</span></button>
+      <div class="slider">
+        <div class="slider-head"><span class="lbl">🕑 时间 Time</span><span class="val" id="time-val">12:00</span></div>
+        <input type="range" id="time-range" min="0" max="1439" value="720" step="5" />
+      </div>
     </section>
 
     <section>

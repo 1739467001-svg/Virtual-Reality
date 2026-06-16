@@ -5,12 +5,16 @@
 // look-and-feel stays in sync.
 import * as THREE from 'three';
 
-// Per-time-of-day palette. top/bot = sky gradient (zenith → horizon).
-const TIME = {
-  day:     { top: '#4a80c0', bot: '#bcd6ee', fog: '#cfe0ee', near: 20, far: 72, sunCol: '#fff4e0', sunI: 2.4,  sunPos: [18, 14, 6],  amb: 0.34, hemi: 0.42, exp: 1.0,  env: true },
-  evening: { top: '#3a2f55', bot: '#f0a85a', fog: '#e8b27a', near: 18, far: 60, sunCol: '#ff9248', sunI: 1.1,  sunPos: [22, 5, 4],   amb: 0.32, hemi: 0.35, exp: 1.0,  env: true },
-  night:   { top: '#05080f', bot: '#16233f', fog: '#10182b', near: 14, far: 55, sunCol: '#9db4e6', sunI: 0.12, sunPos: [16, 12, -6], amb: 0.10, hemi: 0.14, exp: 1.05, env: false },
-};
+// Key palettes reused across the day (bcol/bsize/bop = sun-or-moon look; star =
+// star visibility). top/bot = sky gradient (zenith → horizon).
+const NIGHT = { top: '#05080f', bot: '#16233f', fog: '#10182b', near: 14, far: 55, sunCol: '#9db4e6', sunI: 0.12, amb: 0.10, hemi: 0.14, exp: 1.05, bcol: '#dfe6f5', bsize: 16, bop: 0.9,  star: 0.9 };
+const DAY   = { top: '#4a80c0', bot: '#bcd6ee', fog: '#cfe0ee', near: 20, far: 72, sunCol: '#fff4e0', sunI: 2.4,  amb: 0.34, hemi: 0.42, exp: 1.0,  bcol: '#fff2d0', bsize: 26, bop: 0.85, star: 0.0 };
+const DUSK  = { top: '#3a2f55', bot: '#f0a85a', fog: '#e8b27a', near: 18, far: 60, sunCol: '#ff9248', sunI: 1.1,  amb: 0.32, hemi: 0.35, exp: 1.0,  bcol: '#ff8a3a', bsize: 30, bop: 0.9,  star: 0.12 };
+// Keyframes over a 24h clock; sampled + interpolated for continuous time.
+const KEYS = [
+  { h: 0, p: NIGHT }, { h: 5, p: NIGHT }, { h: 7, p: DUSK }, { h: 9.5, p: DAY },
+  { h: 16.5, p: DAY }, { h: 19, p: DUSK }, { h: 21, p: NIGHT }, { h: 24, p: NIGHT },
+];
 // Weather greys the sky toward `grey`, dims the sun + interior, thickens fog.
 const WEATHER = {
   clear: { grey: '#808080', greyAmt: 0.0, sunMul: 1.0,  fogMul: 1.0, ambMul: 1.0,  hemiMul: 1.0,  expMul: 1.0,  particle: null },
@@ -24,17 +28,11 @@ const SEASON_LIGHT = {
   autumn: { ambMul: 1.0,  expMul: 0.99 },
   winter: { ambMul: 0.96, expMul: 0.97 },
 };
-// Celestial body (sun by day, moon by night) + star visibility per time.
-const SKY_BODY = {
-  day:     { col: '#fff2d0', size: 26, op: 0.85, star: 0.0 },
-  evening: { col: '#ff8a3a', size: 30, op: 0.9,  star: 0.12 },
-  night:   { col: '#dfe6f5', size: 16, op: 0.9,  star: 0.9 },
-};
 
 const PARTICLE_VOL = { x0: 6, x1: 28, y0: 0, y1: 16, z0: -12, z1: 16 };  // outdoors, +x of the windows
 
 export function createEnvironment({ scene, renderer, lights, room, env }) {
-  const state = { time: 'day', weather: 'clear', season: 'summer' };
+  const state = { hour: 12, weather: 'clear', season: 'summer' };
 
   // ---- Sky gradient as the scene background -----------------------------
   const sky = makeSky();
@@ -62,25 +60,25 @@ export function createEnvironment({ scene, renderer, lights, room, env }) {
   let settled = false;
 
   function recompute() {
-    const t = TIME[state.time], w = WEATHER[state.weather];
+    const s = sampleKeys(state.hour);
+    const w = WEATHER[state.weather];
     const sl = SEASON_LIGHT[state.season] || SEASON_LIGHT.summer;
-    const b = SKY_BODY[state.time];
     const grey = new THREE.Color(w.grey);
-    tgt.top.set(t.top).lerp(grey, w.greyAmt);
-    tgt.bot.set(t.bot).lerp(grey, w.greyAmt);
-    tgt.fog.set(t.fog).lerp(grey, w.greyAmt * 0.7);
-    tgt.near = t.near; tgt.far = t.far * w.fogMul;
-    tgt.sunCol.set(t.sunCol); tgt.sunI = t.sunI * w.sunMul;
-    tgt.sunPos.set(...t.sunPos);
-    tgt.amb = t.amb * w.ambMul * sl.ambMul;
-    tgt.hemi = t.hemi * w.hemiMul;
-    tgt.exp = t.exp * w.expMul * sl.expMul;
+    tgt.top.copy(s.top).lerp(grey, w.greyAmt);
+    tgt.bot.copy(s.bot).lerp(grey, w.greyAmt);
+    tgt.fog.copy(s.fog).lerp(grey, w.greyAmt * 0.7);
+    tgt.near = s.near; tgt.far = s.far * w.fogMul;
+    tgt.sunCol.copy(s.sunCol); tgt.sunI = s.sunI * w.sunMul;
+    tgt.sunPos.copy(sunArc(state.hour)).multiplyScalar(30);
+    tgt.amb = s.amb * w.ambMul * sl.ambMul;
+    tgt.hemi = s.hemi * w.hemiMul;
+    tgt.exp = s.exp * w.expMul * sl.expMul;
     // Clouds hide the sun/moon and stars.
-    tgt.celCol.set(b.col); tgt.celSize = b.size;
-    tgt.celOpacity = b.op * Math.max(0, 1 - w.greyAmt * 1.2);
-    tgt.starOp = b.star * Math.max(0, 1 - w.greyAmt * 1.5);
+    tgt.celCol.copy(s.bcol); tgt.celSize = s.bsize;
+    tgt.celOpacity = s.bop * Math.max(0, 1 - w.greyAmt * 1.2);
+    tgt.starOp = s.star * Math.max(0, 1 - w.greyAmt * 1.5);
     settled = false;
-    scene.environment = t.env ? (env ?? null) : null;
+    scene.environment = s.sunI > 0.3 ? (env ?? null) : null;
     rain.points.visible = w.particle === 'rain';
     snow.points.visible = w.particle === 'snow';
   }
@@ -108,7 +106,7 @@ export function createEnvironment({ scene, renderer, lights, room, env }) {
 
   function update(dt) {
     if (!settled) {
-      const a = 1 - Math.exp(-dt * 2.4);
+      const a = 1 - Math.exp(-dt * 3.2);
       cur.top.lerp(tgt.top, a); cur.bot.lerp(tgt.bot, a); cur.fog.lerp(tgt.fog, a);
       cur.near += (tgt.near - cur.near) * a; cur.far += (tgt.far - cur.far) * a;
       cur.sunCol.lerp(tgt.sunCol, a); cur.sunI += (tgt.sunI - cur.sunI) * a;
@@ -136,11 +134,39 @@ export function createEnvironment({ scene, renderer, lights, room, env }) {
 
   return {
     state, update,
-    times: Object.keys(TIME), weathers: Object.keys(WEATHER), seasons: room.seasons,
-    setTime(name) { if (TIME[name]) { state.time = name; recompute(); } return state.time; },
+    weathers: Object.keys(WEATHER), seasons: room.seasons,
+    setHour(h) { state.hour = ((h % 24) + 24) % 24; recompute(); return state.hour; },
     setWeather(name) { if (WEATHER[name]) { state.weather = name; recompute(); } return state.weather; },
     setSeason(name) { state.season = room.setSeason(name); recompute(); return state.season; },
   };
+}
+
+// Sample the 24h keyframes at hour h, lerping colours + numbers.
+function sampleKeys(h) {
+  h = ((h % 24) + 24) % 24;
+  let i = 0;
+  while (i < KEYS.length - 2 && h >= KEYS[i + 1].h) i++;
+  const k0 = KEYS[i], k1 = KEYS[i + 1];
+  const f = k1.h > k0.h ? (h - k0.h) / (k1.h - k0.h) : 0;
+  const a = k0.p, b = k1.p;
+  const C = (x, y) => new THREE.Color(x).lerp(new THREE.Color(y), f);
+  const N = (x, y) => x + (y - x) * f;
+  return {
+    top: C(a.top, b.top), bot: C(a.bot, b.bot), fog: C(a.fog, b.fog),
+    near: N(a.near, b.near), far: N(a.far, b.far), sunCol: C(a.sunCol, b.sunCol), sunI: N(a.sunI, b.sunI),
+    amb: N(a.amb, b.amb), hemi: N(a.hemi, b.hemi), exp: N(a.exp, b.exp),
+    bcol: C(a.bcol, b.bcol), bsize: N(a.bsize, b.bsize), bop: N(a.bop, b.bop), star: N(a.star, b.star),
+  };
+}
+
+// Sun/moon direction for hour h. The visible body (sun by day, moon by night)
+// rises near the windows (+x), arcs overhead and sets, sweeping east↔west on z.
+function sunArc(h) {
+  const ang = 2 * Math.PI * (h - 6) / 24;   // h6 = 0 (sunrise), h12 = noon
+  const elev = Math.sin(ang);               // sun elevation (negative at night)
+  const bodyElev = Math.abs(elev);          // whichever body is currently up
+  const hz = Math.cos(ang);
+  return new THREE.Vector3(0.55, bodyElev * 1.25 + 0.06, hz * 0.9);
 }
 
 // --------------------------------------------------------------------------

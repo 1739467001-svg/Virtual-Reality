@@ -9,7 +9,6 @@ const WALL_COLORS = [
   { name: '浅杏 Apricot', hex: '#e9d9c5' },
 ];
 const FLOOR_LABELS = { oak: '橡木 Oak', walnut: '胡桃 Walnut', ash: '白蜡 Ash', grey: '灰木 Grey' };
-const TIME_LABELS = { day: '☀️ 白天 Day', evening: '🌇 黄昏 Evening', night: '🌙 夜晚 Night' };
 const WEATHER_LABELS = { clear: '☀️ 晴 Clear', rain: '🌧️ 雨 Rain', snow: '❄️ 雪 Snow' };
 const SEASON_LABELS = { spring: '🌸 春 Spring', summer: '🌿 夏 Summer', autumn: '🍂 秋 Autumn', winter: '⛄ 冬 Winter' };
 
@@ -43,7 +42,8 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
   };
 
   // ---- Element handles ---------------------------------------------------
-  const ceiling = $('btn-ceiling'), lamp = $('btn-lamp'), timeBtn = $('btn-time');
+  const ceiling = $('btn-ceiling'), lamp = $('btn-lamp');
+  const timeRange = $('time-range'), timeVal = $('time-val');
   const sofaColorBtn = $('btn-sofa-color'), sofaStyleBtn = $('btn-sofa-style');
   const tableBtn = $('btn-table'), rugToggle = $('btn-rug-toggle');
   const wallBtn = $('btn-wall'), floorBtn = $('btn-floor');
@@ -51,14 +51,15 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
   const weatherBtn = $('btn-weather'), seasonBtn = $('btn-season');
 
   // ---- Indexed finishes (apply functions double as cycle + restore) ------
-  const idx = { wall: 0, floor: 0, time: 0, pic: 0, kitchen: 0, weather: 0, season: 0 };
+  const idx = { wall: 0, floor: 0, timeMin: 720, pic: 0, kitchen: 0, weather: 0, season: 0 };
   const wrap = (v, n) => ((Math.trunc(v) % n) + n) % n;
 
-  function applyTime(i) {
-    idx.time = wrap(i, environment.times.length);
-    const t = environment.times[idx.time];
-    environment.setTime(t);
-    timeBtn.querySelector('.val').textContent = TIME_LABELS[t];
+  const fmtTime = (m) => `${Math.floor(m / 60)}:${String(Math.round(m) % 60).padStart(2, '0')}`;
+  function applyTime(minutes) {
+    idx.timeMin = Math.max(0, Math.min(1439, Math.round(minutes)));
+    environment.setHour(idx.timeMin / 60);
+    timeRange.value = idx.timeMin;
+    timeVal.textContent = fmtTime(idx.timeMin);
   }
   function applyWeather(i) {
     idx.weather = wrap(i, environment.weathers.length);
@@ -99,7 +100,7 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
   }
 
   // Initial labels (match the environment's default state).
-  applyTime(0); applyWall(0); applyFloor(0); applyPicture(0); applyKitchen(0);
+  applyTime(720); applyWall(0); applyFloor(0); applyPicture(0); applyKitchen(0);
   applyWeather(environment.weathers.indexOf(environment.state.weather));
   applySeason(environment.seasons.indexOf(environment.state.season));
   setBtn(ceiling, lights.state.ceiling);
@@ -109,7 +110,7 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
   // ---- Listeners: lights / time -----------------------------------------
   ceiling.addEventListener('click', () => { lights.setCeiling(!lights.state.ceiling); setBtn(ceiling, lights.state.ceiling); });
   lamp.addEventListener('click', () => { lights.setLamp(!lights.state.lamp); setBtn(lamp, lights.state.lamp); });
-  timeBtn.addEventListener('click', () => applyTime(idx.time + 1));
+  timeRange.addEventListener('input', () => applyTime(+timeRange.value));
 
   // ---- Listeners: furniture ---------------------------------------------
   sofaColorBtn.addEventListener('click', () => {
@@ -168,7 +169,7 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
   // ---- Save & Share via URL ---------------------------------------------
   const gather = () => Object.assign(
     {
-      v: 1, wl: idx.wall, fl: idx.floor, tm: idx.time, pk: idx.pic, kt: idx.kitchen,
+      v: 1, wl: idx.wall, fl: idx.floor, hr: idx.timeMin, pk: idx.pic, kt: idx.kitchen,
       we: idx.weather, se: idx.season,
       cl: lights.state.ceiling ? 1 : 0, lp: lights.state.lamp ? 1 : 0,
     },
@@ -177,7 +178,8 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
   const encode = (s) => btoa(encodeURIComponent(JSON.stringify(s)));
   const decode = (str) => JSON.parse(decodeURIComponent(atob(str)));
   function applyAll(s) {
-    if (typeof s.tm === 'number') applyTime(s.tm);
+    if (typeof s.hr === 'number') applyTime(s.hr);
+    else if (typeof s.tm === 'number') applyTime([720, 1140, 1320][s.tm] ?? 720); // legacy day/evening/night
     if (typeof s.wl === 'number') applyWall(s.wl);
     if (typeof s.fl === 'number') applyFloor(s.fl);
     if (typeof s.pk === 'number') applyPicture(s.pk);

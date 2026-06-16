@@ -620,11 +620,11 @@ function buildWindow(win) {
 function buildExterior() {
   const g = new THREE.Group();
   const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(40, 32),
+    new THREE.CircleGeometry(95, 40),
     new THREE.MeshStandardMaterial({ color: '#6a9a4a', roughness: 1 })
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(14, -0.02, 0);
+  ground.position.set(26, -0.02, 0);
   g.add(ground);
 
   const trunkMat = new THREE.MeshStandardMaterial({ color: '#6b4423' });
@@ -647,13 +647,48 @@ function buildExterior() {
   tree(10, 6, 1.2);     // visible through the bedroom window
   tree(12.5, 4.5, 1.0);
 
-  const bldg = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 9, 6),
-    new THREE.MeshStandardMaterial({ color: '#b7c0c8', roughness: 0.9 })
-  );
-  bldg.position.set(20, 4.5, -6);
-  g.add(bldg);
+  // Distant mountains (hazy — the fog gives them aerial perspective).
+  const mtnMat = new THREE.MeshStandardMaterial({ color: '#8b99ad', roughness: 1, flatShading: true });
+  const mountain = (x, z, r, h) => {
+    const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 5, 1), mtnMat);
+    m.position.set(x, h / 2 - 1.5, z);
+    g.add(m);
+  };
+  mountain(64, -12, 22, 16); mountain(73, 9, 27, 21); mountain(60, 20, 18, 13); mountain(80, -2, 24, 18);
+
+  // City skyline: varied towers with faintly lit windows (read as a lit city
+  // at night, washed out by daylight). Built once with stable pseudo-random.
+  const winTex = makeBuildingWindows();
+  let seed = 1337;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let i = 0; i < 18; i++) {
+    const bw = 2 + rnd() * 3.5, bh = 6 + rnd() * 18, bd = 2 + rnd() * 3.5;
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color().setHSL(0.6, 0.06, 0.4 + rnd() * 0.12), roughness: 0.85,
+      emissive: '#ffe6b0', emissiveIntensity: 0.35, emissiveMap: winTex,
+    });
+    const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);
+    b.position.set(30 + rnd() * 18, bh / 2, -30 + rnd() * 60);
+    g.add(b);
+  }
   return g;
+}
+
+// A dark tile with a grid of small lit windows, used as an emissive map so only
+// the window cells of a building glow.
+function makeBuildingWindows() {
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 32, 64);
+  ctx.fillStyle = '#ffdca0';
+  for (let y = 4; y < 62; y += 8) for (let x = 4; x < 30; x += 8) {
+    if (Math.random() < 0.6) ctx.fillRect(x, y, 4, 5);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 2);
+  return tex;
 }
 
 // Cloth curtain panels + rod flanking the window on the right wall.
