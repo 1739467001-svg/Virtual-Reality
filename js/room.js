@@ -143,6 +143,13 @@ export function buildRoom(scene, layout = LAYOUT) {
   group.add(buildCurtains(win));
   group.add(buildClock());
 
+  // ---- Living-room accents ----------------------------------------------
+  const mat0 = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.6),
+    new THREE.MeshStandardMaterial({ color: '#8a7f6c', roughness: 1 }));
+  mat0.rotation.x = -Math.PI / 2; mat0.position.set(2.2, 0.015, ROOM.d / 2 - 0.55); mat0.receiveShadow = true;
+  group.add(mat0);                                   // doormat by the door
+  const lp = pottedPlant(1.25); lp.position.set(-4.4, 0, 3.4); group.add(lp);  // front-left corner
+
   // ---- Open kitchen along the living-room left wall ---------------------
   const kitchen = buildKitchen(group, colliders);
 
@@ -221,6 +228,9 @@ export function buildRoom(scene, layout = LAYOUT) {
     // Framed art above the main bed (on the far wall, facing the room).
     group.add(makePicture(2, new THREE.Vector3(3.5, 1.9, back2 - 0.08), Math.PI));
     if (twoBed) group.add(makePicture(1, new THREE.Vector3(-3.4, 1.9, back2 - 0.08), Math.PI));
+    // Corner potted plant(s) for a lived-in feel.
+    const bp = pottedPlant(1); bp.position.set(4.5, 0, divZ + 0.7); group.add(bp);
+    if (twoBed) { const bp2 = pottedPlant(1); bp2.position.set(-4.5, 0, divZ + 0.7); group.add(bp2); }
 
     if (hasBath) buildBathroom(group, colliders, walls, wallMat, fixtures, back2);
 
@@ -406,8 +416,6 @@ function buildDoor(door, fz = ROOM.d / 2, hingeAngle = -0.6) {
   return g;
 }
 
-// Bed / nightstand / toilet / sink / shower are now movable catalogue pieces
-// (see buildExtra in furniture.js); each layout places them via room.fixtures.
 function buildSoftRug(x, z, color) {
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 1 });
   const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.8), mat);
@@ -415,6 +423,21 @@ function buildSoftRug(x, z, color) {
   rug.position.set(x, 0.012, z);
   rug.receiveShadow = true;
   return rug;
+}
+
+// Small decorative potted plant reused across rooms (static accent).
+function pottedPlant(s = 1) {
+  const g = new THREE.Group();
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.1 * s, 0.28 * s, 16),
+    new THREE.MeshStandardMaterial({ color: '#b5651d', roughness: 0.8 }));
+  pot.position.y = 0.14 * s; pot.castShadow = true; g.add(pot);
+  const foliageMat = new THREE.MeshStandardMaterial({ color: '#3f7d34', roughness: 0.9 });
+  for (let i = 0; i < 3; i++) {
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.22 * s, 10, 10), foliageMat);
+    leaf.position.set((i - 1) * 0.1 * s, (0.42 + i * 0.13) * s, (1 - i) * 0.07 * s);
+    leaf.scale.y = 1.4; leaf.castShadow = true; g.add(leaf);
+  }
+  return g;
 }
 
 function buildCeilingFixture(x, z) {
@@ -475,6 +498,17 @@ function buildBathroom(group, colliders, walls, wallMat, fixtures, back2) {
     new THREE.MeshStandardMaterial({ color: '#8fb0bf', roughness: 1 }));
   mat.rotation.x = -Math.PI / 2; mat.position.set(midX + 0.4, 0.025, midZ - 0.9); mat.receiveShadow = true;
   group.add(mat);
+
+  // Wall shelf with toiletry bottles + a corner plant.
+  const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.5),
+    new THREE.MeshStandardMaterial({ color: '#e8e2d6', roughness: 0.7 }));
+  shelf.position.set(x1 - 0.1, 1.55, midZ + 0.5); group.add(shelf);
+  for (const [dz, col, hh] of [[0.4, '#7fb2c0', 0.16], [0.55, '#cf8f9c', 0.12]]) {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, hh, 10),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.4 }));
+    b.position.set(x1 - 0.1, 1.57 + hh / 2, midZ + dz); group.add(b);
+  }
+  const bpl = pottedPlant(0.7); bpl.position.set(x0 + 0.4, 0, z0 + 0.4); group.add(bpl);
 }
 
 // Open kitchen run along the living-room left wall (x = -w/2), present in every
@@ -535,6 +569,21 @@ function buildKitchen(group, colliders) {
   pot.position.set(cxK, 0.96, cz - 1.8); group.add(pot);
   const herb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 10), new THREE.MeshStandardMaterial({ color: '#4f8a3a', roughness: 0.9 }));
   herb.position.set(cxK, 1.08, cz - 1.8); group.add(herb);
+
+  // Pendant lamps over the counter.
+  const shadeMat = new THREE.MeshStandardMaterial({ color: '#2b2b2e', emissive: '#ffdca0', emissiveIntensity: 0.7, roughness: 0.5, side: THREE.DoubleSide });
+  for (const pz of [cz - 0.6, cz + 0.6]) {
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.5), new THREE.MeshStandardMaterial({ color: '#222' }));
+    cord.position.set(cxK + 0.05, ROOM.h - 0.25, pz); group.add(cord);
+    const shade = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.16, 20, 1, true), shadeMat);
+    shade.position.set(cxK + 0.05, ROOM.h - 0.55, pz); group.add(shade);
+  }
+  // Knife block + kettle on the counter.
+  const block = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.1),
+    new THREE.MeshStandardMaterial({ color: '#5a3a22', roughness: 0.6 }));
+  block.position.set(cxK, 0.99, cz - 0.05); group.add(block);
+  const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.17, 16), steelMat);
+  kettle.position.set(cxK + 0.02, 0.97, cz + 0.35); group.add(kettle);
 
   colliders.push({ minX: x, maxX: x + depth, minZ: z0 - 0.05, maxZ: z1 + 0.05 });
 
