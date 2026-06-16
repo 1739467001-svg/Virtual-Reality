@@ -218,6 +218,9 @@ export function buildRoom(scene, layout = LAYOUT) {
     bLamp.castShadow = true;
     group.add(bLamp);
     group.add(buildCeilingFixture(twoBed ? 2.5 : 0, cz));
+    // Framed art above the main bed (on the far wall, facing the room).
+    group.add(makePicture(2, new THREE.Vector3(3.5, 1.9, back2 - 0.08), Math.PI));
+    if (twoBed) group.add(makePicture(1, new THREE.Vector3(-3.4, 1.9, back2 - 0.08), Math.PI));
 
     if (hasBath) buildBathroom(group, colliders, walls, wallMat, fixtures, back2);
 
@@ -463,6 +466,15 @@ function buildBathroom(group, colliders, walls, wallMat, fixtures, back2) {
   light.position.set(midX, ROOM.h - 0.3, midZ);
   group.add(light);
   group.add(buildCeilingFixture(midX, midZ));
+
+  // Details: a hanging towel + a bath mat.
+  const towel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.3),
+    new THREE.MeshStandardMaterial({ color: '#cfe0e6', roughness: 0.95 }));
+  towel.position.set(x1 - 0.05, 1.1, midZ - 0.7); group.add(towel);
+  const mat = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.5),
+    new THREE.MeshStandardMaterial({ color: '#8fb0bf', roughness: 1 }));
+  mat.rotation.x = -Math.PI / 2; mat.position.set(midX + 0.4, 0.025, midZ - 0.9); mat.receiveShadow = true;
+  group.add(mat);
 }
 
 // Open kitchen run along the living-room left wall (x = -w/2), present in every
@@ -504,6 +516,25 @@ function buildKitchen(group, colliders) {
   const fridge = new THREE.Mesh(new THREE.BoxGeometry(0.64, 1.9, 0.66),
     new THREE.MeshStandardMaterial({ color: '#dfe3e6', metalness: 0.4, roughness: 0.4 }));
   fridge.position.set(x + 0.34, 0.95, z1 - 0.33); fridge.castShadow = true; group.add(fridge);
+
+  // Countertop decor: fruit bowl, bottles, a potted herb.
+  const cxK = x + depth / 2;
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.07, 16),
+    new THREE.MeshStandardMaterial({ color: '#cdbfa6', roughness: 0.6 }));
+  bowl.position.set(cxK, 0.95, cz - 0.4); group.add(bowl);
+  for (const [dx, dz, col] of [[-0.05, 0, '#d8643c'], [0.05, 0.03, '#e0a32e'], [0, -0.05, '#b5512f']]) {
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 10), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 }));
+    fruit.position.set(cxK + dx, 1.0, cz - 0.4 + dz); group.add(fruit);
+  }
+  for (const [dz, col, hh] of [[1.7, '#5a7d6a', 0.26], [1.5, '#7a8a9a', 0.2]]) {
+    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, hh, 12),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.3, metalness: 0.1 }));
+    bottle.position.set(cxK - 0.1, 0.88 + hh / 2, cz + dz); group.add(bottle);
+  }
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.1, 12), new THREE.MeshStandardMaterial({ color: '#b5651d', roughness: 0.8 }));
+  pot.position.set(cxK, 0.96, cz - 1.8); group.add(pot);
+  const herb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 10), new THREE.MeshStandardMaterial({ color: '#4f8a3a', roughness: 0.9 }));
+  herb.position.set(cxK, 1.08, cz - 1.8); group.add(herb);
 
   colliders.push({ minX: x, maxX: x + depth, minZ: z0 - 0.05, maxZ: z1 + 0.05 });
 

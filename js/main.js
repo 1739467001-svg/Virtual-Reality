@@ -56,10 +56,13 @@ const player = new Player(camera, renderer.domElement, {
 });
 
 // ---- Furniture mover (pick up & reposition) ------------------------------
+// Held items can be placed anywhere walkable (whole apartment, not just the
+// living room), so the bedroom/bathroom fixtures move freely.
 const FBOUNDS = {
-  minX: -ROOM.w / 2 + 0.15, maxX: ROOM.w / 2 - 0.15,
-  minZ: -ROOM.d / 2 + 0.15, maxZ: ROOM.d / 2 - 0.15,
+  minX: room.floorplan.ext.minX + 0.2, maxX: room.floorplan.ext.maxX - 0.2,
+  minZ: room.floorplan.ext.minZ + 0.2, maxZ: room.floorplan.ext.maxZ - 0.2,
 };
+const HOLD_DIST = 1.6;   // how far in front of you a carried item floats
 const mover = createMover();
 
 // ---- UI ------------------------------------------------------------------
@@ -266,14 +269,12 @@ function renderFrame() {
 }
 
 // --------------------------------------------------------------------------
-// Furniture mover: raycast from screen centre, click to pick up / drop, the
-// selected piece follows where you look along the floor.
+// Furniture mover: raycast from screen centre to pick up; the held piece then
+// floats a fixed distance in front of you, so turning + walking position it.
 // --------------------------------------------------------------------------
 function createMover() {
   const ray = new THREE.Raycaster();
-  const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const centre = new THREE.Vector2(0, 0);
-  const hitPoint = new THREE.Vector3();
   const ITEM_COLORS = ['#c0563f', '#3d6b8f', '#6b8f5e', '#caa94a', '#7d5a86', '#4a4f57', '#d7cfc2'];
   let colorIdx = -1;
   let active = false;
@@ -286,16 +287,18 @@ function createMover() {
       active = !active;
       api.active = active;
       if (!active) drop();
-      else announce('移动模式：走近家具，点击拾起 · Move mode: click furniture to pick up');
+      else announce('移动模式：走近家具点击拾起 · Move mode: click a piece to pick up');
     },
     update() {
       if (!active || !selected) return;
-      ray.setFromCamera(centre, camera);
-      if (ray.ray.intersectPlane(floor, hitPoint)) {
-        const hw = selected.foot.w / 2, hd = selected.foot.d / 2;
-        selected.holder.position.x = clamp(hitPoint.x, FBOUNDS.minX + hw, FBOUNDS.maxX - hw);
-        selected.holder.position.z = clamp(hitPoint.z, FBOUNDS.minZ + hd, FBOUNDS.maxZ - hd);
-      }
+      // Carry the piece a fixed distance in front of the player, so turning
+      // sweeps it left/right and walking carries it — at any view angle.
+      const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+      const hw = selected.foot.w / 2, hd = selected.foot.d / 2;
+      const tx = camera.position.x + fx * HOLD_DIST;
+      const tz = camera.position.z + fz * HOLD_DIST;
+      selected.holder.position.x = clamp(tx, FBOUNDS.minX + hw, FBOUNDS.maxX - hw);
+      selected.holder.position.z = clamp(tz, FBOUNDS.minZ + hd, FBOUNDS.maxZ - hd);
     },
     // Rotate the held piece (on-screen buttons + Q/E keys).
     rotate(delta) {
@@ -335,7 +338,7 @@ function createMover() {
   function announce(msg) { api.onChange?.(active, msg); }
   function drop() {
     if (selected) { selected.holder.position.y = 0; selected = null; }
-    announce(active ? '移动模式：点击拾起 · 选中后按 Delete 删除 · Click to pick up, Delete to remove' : '');
+    announce(active ? '移动模式：点击拾起家具 · Click a piece to pick up' : '');
   }
 
   // Delete / rotate the selected piece via the keyboard.
@@ -356,7 +359,7 @@ function createMover() {
       if (p) {
         selected = p;
         p.holder.position.y = 0.04;
-        announce(`移动中 Moving: ${p.name} — 再次点击放下 · click to drop`);
+        announce('拾起 Holding — 走动/转身摆放，Q/E 或 ⟲⟳ 旋转，再次点击放下 · move & turn to place, click to drop');
       }
     }
   });
