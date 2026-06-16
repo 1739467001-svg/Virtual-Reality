@@ -120,6 +120,8 @@ document.getElementById('btn-rot-r').addEventListener('click', () => mover.rotat
 document.getElementById('btn-color').addEventListener('click', () => mover.recolor());
 document.getElementById('btn-scale-up').addEventListener('click', () => mover.scaleBy(1.1));
 document.getElementById('btn-scale-dn').addEventListener('click', () => mover.scaleBy(1 / 1.1));
+document.getElementById('btn-lift-up').addEventListener('click', () => mover.lift(0.1));
+document.getElementById('btn-lift-dn').addEventListener('click', () => mover.lift(-0.1));
 
 // ---- Tape measure tool ---------------------------------------------------
 const measure = createMeasure();
@@ -286,10 +288,22 @@ function renderFrame() {
 function createMover() {
   const ray = new THREE.Raycaster();
   const centre = new THREE.Vector2(0, 0);
+  const downRay = new THREE.Raycaster();
+  const DOWN = new THREE.Vector3(0, -1, 0);
+  const probe = new THREE.Vector3();
   const ITEM_COLORS = ['#c0563f', '#3d6b8f', '#6b8f5e', '#caa94a', '#7d5a86', '#4a4f57', '#d7cfc2'];
   let colorIdx = -1;
+  let liftOffset = 0;          // extra height above the surface the item rests on
   let active = false;
   let selected = null;
+
+  const isUnder = (obj, ancestor) => { for (let o = obj; o; o = o.parent) if (o === ancestor) return true; return false; };
+  const surfaceYAt = (x, z) => {
+    downRay.set(probe.set(x, 2.9, z), DOWN);
+    const hits = downRay.intersectObjects([furniture.group, room.group], true);
+    for (const h of hits) if (!isUnder(h.object, selected.holder)) return h.point.y;
+    return 0;
+  };
 
   const api = {
     active,
@@ -310,6 +324,8 @@ function createMover() {
       const tz = camera.position.z + fz * HOLD_DIST;
       selected.holder.position.x = clamp(tx, FBOUNDS.minX + hw, FBOUNDS.maxX - hw);
       selected.holder.position.z = clamp(tz, FBOUNDS.minZ + hd, FBOUNDS.maxZ - hd);
+      // Rest on whatever surface is beneath (floor / table / bed / shelf) + lift.
+      selected.holder.position.y = surfaceYAt(selected.holder.position.x, selected.holder.position.z) + liftOffset;
     },
     // Rotate the held piece (on-screen buttons + Q/E keys).
     rotate(delta) {
@@ -331,6 +347,12 @@ function createMover() {
       const s = furniture.setItemScale(selected, selected.scale * f);
       announce('缩放 Scale ×' + s.toFixed(2));
     },
+    // Raise / lower the held piece above the surface it rests on.
+    lift(delta) {
+      if (!active || !selected) { announce('先拾起家具再调高度 · Pick up a piece first'); return; }
+      liftOffset = clamp(liftOffset + delta, 0, 2.5);
+      announce('高度 Lift +' + liftOffset.toFixed(2) + 'm · 自动吸附台面 · auto-rests on surfaces');
+    },
   };
 
   function pick() {
@@ -348,11 +370,11 @@ function createMover() {
   }
   function announce(msg) { api.onChange?.(active, msg); }
   function drop() {
-    if (selected) { selected.holder.position.y = 0; selected = null; }
+    selected = null;   // leave the piece resting where it was placed (on its surface)
     announce(active ? '移动模式：点击拾起家具 · Click a piece to pick up' : '');
   }
 
-  // Delete / rotate the selected piece via the keyboard.
+  // Delete / rotate / raise-lower the selected piece via the keyboard.
   addEventListener('keydown', (e) => {
     if (!active || !selected) return;
     if (e.code === 'Delete' || e.code === 'Backspace' || e.code === 'KeyX') {
@@ -360,7 +382,16 @@ function createMover() {
       else announce('该家具不可删除 · This piece can\'t be removed');
     } else if (e.code === 'KeyQ') selected.holder.rotation.y += 0.18;
     else if (e.code === 'KeyE') selected.holder.rotation.y -= 0.18;
+    else if (e.code === 'KeyR') api.lift(0.08);
+    else if (e.code === 'KeyF') api.lift(-0.08);
   });
+
+  // Mouse wheel raises / lowers the held piece.
+  renderer.domElement.addEventListener('wheel', (e) => {
+    if (!active || !selected) return;
+    e.preventDefault();
+    api.lift(e.deltaY < 0 ? 0.06 : -0.06);
+  }, { passive: false });
 
   renderer.domElement.addEventListener('pointerdown', () => {
     if (!active) return;
@@ -369,8 +400,8 @@ function createMover() {
       const p = pick();
       if (p) {
         selected = p;
-        p.holder.position.y = 0.04;
-        announce('拾起 Holding — 走动/转身摆放，Q/E 或 ⟲⟳ 旋转，再次点击放下 · move & turn to place, click to drop');
+        liftOffset = 0;
+        announce('拾起 Holding — 走动/转身摆放，自动吸附台面；R/F 或滚轮调高度，Q/E 旋转，再次点击放下');
       }
     }
   });

@@ -225,6 +225,7 @@ export function buildFurniture(scene) {
           r: r2(pc.holder.rotation.y),
           s: pc.scale && pc.scale !== 1 ? r2(pc.scale) : undefined,
           c: pc.color || undefined,
+          y: pc.holder.position.y > 0.01 ? r2(pc.holder.position.y) : undefined,
         })),
       };
     },
@@ -253,6 +254,7 @@ export function buildFurniture(scene) {
           if (pc) {
             if (typeof it.s === 'number') setItemScale(pc, it.s);
             if (it.c) setItemColor(pc, it.c);
+            if (typeof it.y === 'number') pc.holder.position.y = it.y;
           }
         }
       }

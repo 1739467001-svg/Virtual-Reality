@@ -46,6 +46,7 @@ it runs from any static host (or opened straight as `index.html`).
 | 切换灯光 / 家具 / 装修 | 右上角控制面板 Panel (top-right) |
 | 移动家具 Move furniture | 面板开启移动模式后，点击拾起 / 放下 |
 | 旋转家具 Rotate | 拾起后 `Q` / `E`，或面板 ⟲ / ⟳ 按钮 |
+| 调高度 Raise/Lower | 拾起后 `R` / `F` 或鼠标滚轮（或面板 ↑ / ↓）—— 自动吸附台面，可把摆件放到桌面/书架 |
 | 删除家具 Delete | 拾起后 `Delete` / `Backspace` / `X` |
 | 拍照导出 Snapshot | 面板「📸 拍照」导出当前视角 PNG |
 
