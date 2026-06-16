@@ -155,6 +155,7 @@ export function buildRoom(scene, layout = LAYOUT) {
     ? { minX: -ROOM.w / 2, maxX: ROOM.w / 2, minZ: -ROOM.d / 2, maxZ: back2 }
     : { minX: -ROOM.w / 2, maxX: ROOM.w / 2, minZ: -ROOM.d / 2, maxZ: ROOM.d / 2 };
   const walls = [];                     // interior wall line segments for the minimap
+  const fixtures = [];                  // movable items each layout drops in (placed by main.js)
 
   if (apartment) {
     const cz = (divZ + back2) / 2;      // bedroom centre on z
@@ -204,14 +205,12 @@ export function buildRoom(scene, layout = LAYOUT) {
     seg(dr, ROOM.w / 2);
     walls.push({ x1: -ROOM.w / 2, z: divZ, x2: dl }, { x1: dr, z: divZ, x2: ROOM.w / 2 });
 
+    // Movable bedroom furniture (placed by main.js as pick-up-able pieces).
     // Bed in the far-right corner, headboard to the back wall — clear of the
     // entrance door and (for the suite) of the bathroom in the far-left corner.
-    const bed = buildBed();
-    bed.position.set(3.6, 0, back2 - 1.6);
-    bed.rotation.y = Math.PI;             // headboard faces the far wall (+z)
-    group.add(bed);
-    colliders.push({ minX: 2.55, maxX: 4.65, minZ: back2 - 2.75, maxZ: back2 - 0.45 });
-    group.add(buildNightstand(2.3, back2 - 0.6));
+    fixtures.push({ type: 'bed', x: 3.6, z: back2 - 1.6, rot: Math.PI });
+    fixtures.push({ type: 'nightstand', x: 2.3, z: back2 - 0.6, rot: 0 });
+    if (layout === 'oneBed') fixtures.push({ type: 'wardrobe', x: -4.3, z: back2 - 0.4, rot: Math.PI });
     group.add(buildSoftRug(twoBed ? 2.6 : 0.4, cz + 0.3, '#7c6f63'));
 
     const bLamp = new THREE.PointLight('#ffe3b8', 14, 9, 2);
@@ -220,7 +219,7 @@ export function buildRoom(scene, layout = LAYOUT) {
     group.add(bLamp);
     group.add(buildCeilingFixture(twoBed ? 2.5 : 0, cz));
 
-    if (hasBath) buildBathroom(group, colliders, walls, wallMat, back2);
+    if (hasBath) buildBathroom(group, colliders, walls, wallMat, fixtures, back2);
 
     if (twoBed) {
       // Central partition splitting the back zone into two bedrooms, connected
@@ -234,12 +233,9 @@ export function buildRoom(scene, layout = LAYOUT) {
       colliders.push({ minX: -ROOM.wall / 2, maxX: ROOM.wall / 2, minZ: cz + gap, maxZ: back2 });
       walls.push({ x1: 0, z1: divZ, x2: 0, z2: cz - gap }, { x1: 0, z1: cz + gap, x2: 0, z2: back2 });
 
-      // Second bedroom (left): bed + nightstand + light.
-      const bed2 = buildBed();
-      bed2.position.set(-3.4, 0, back2 - 1.6); bed2.rotation.y = Math.PI;
-      group.add(bed2);
-      colliders.push({ minX: -4.45, maxX: -2.35, minZ: back2 - 2.75, maxZ: back2 - 0.45 });
-      group.add(buildNightstand(-2.1, back2 - 0.6));
+      // Second bedroom (left): movable bed + nightstand + a light.
+      fixtures.push({ type: 'bed', x: -3.4, z: back2 - 1.6, rot: Math.PI });
+      fixtures.push({ type: 'nightstand', x: -2.1, z: back2 - 0.6, rot: 0 });
       const bLamp2 = new THREE.PointLight('#ffe3b8', 13, 8, 2);
       bLamp2.position.set(-2.5, ROOM.h - 0.35, cz); bLamp2.castShadow = true;
       group.add(bLamp2);
@@ -291,7 +287,7 @@ export function buildRoom(scene, layout = LAYOUT) {
     setPictures, cyclePictures: () => setPictures(picIdx + 1), pictureSets: PICTURE_SETS,
     setKitchen, cycleKitchen: () => kitchen.setTheme(kitchen.theme + 1), kitchenThemes: KITCHEN_THEMES.length,
     setSeason, seasons: Object.keys(SEASONS),
-    rooms, layout, colliders, floorplan: { ext, walls },
+    rooms, fixtures, layout, colliders, floorplan: { ext, walls },
   };
 }
 
@@ -407,48 +403,8 @@ function buildDoor(door, fz = ROOM.d / 2, hingeAngle = -0.6) {
   return g;
 }
 
-// ---- Bedroom furnishings (apartment layout) ------------------------------
-function buildBed() {
-  const g = new THREE.Group();
-  const woodMat = new THREE.MeshStandardMaterial({ color: '#6b4a32', roughness: 0.7 });
-  const sheetMat = new THREE.MeshStandardMaterial({ color: '#eae4d8', roughness: 0.95 });
-  const duvetMat = new THREE.MeshStandardMaterial({ color: '#5b7a8c', roughness: 0.9 });
-  const pillowMat = new THREE.MeshStandardMaterial({ color: '#f5f1e8', roughness: 0.95 });
-  const W = 1.8, L = 2.1;            // double bed footprint (x = width, z = length)
-
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 0.28, L + 0.14), woodMat);
-  frame.position.set(0, 0.18, 0); frame.castShadow = true; frame.receiveShadow = true;
-  g.add(frame);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 0.8, 0.12), woodMat);
-  head.position.set(0, 0.5, -L / 2 - 0.01); head.castShadow = true;
-  g.add(head);
-  const mattress = new THREE.Mesh(new THREE.BoxGeometry(W, 0.22, L), sheetMat);
-  mattress.position.set(0, 0.43, 0); mattress.castShadow = true; mattress.receiveShadow = true;
-  g.add(mattress);
-  const duvet = new THREE.Mesh(new THREE.BoxGeometry(W + 0.04, 0.1, L * 0.62), duvetMat);
-  duvet.position.set(0, 0.55, L * 0.18); duvet.castShadow = true;
-  g.add(duvet);
-  for (const sx of [-1, 1]) {
-    const pillow = new THREE.Mesh(new THREE.BoxGeometry(W * 0.42, 0.12, 0.42), pillowMat);
-    pillow.position.set(sx * W * 0.24, 0.6, -L / 2 + 0.34); pillow.castShadow = true;
-    g.add(pillow);
-  }
-  return g;
-}
-
-function buildNightstand(x, z) {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: '#6b4a32', roughness: 0.7 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.42), mat);
-  body.position.y = 0.25; body.castShadow = true; body.receiveShadow = true;
-  g.add(body);
-  const lampMat = new THREE.MeshStandardMaterial({ color: '#d9c08a', emissive: '#ffcf86', emissiveIntensity: 0.5, roughness: 0.6 });
-  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.2, 20), lampMat);
-  shade.position.y = 0.72; g.add(shade);
-  g.position.set(x, 0, z);
-  return g;
-}
-
+// Bed / nightstand / toilet / sink / shower are now movable catalogue pieces
+// (see buildExtra in furniture.js); each layout places them via room.fixtures.
 function buildSoftRug(x, z, color) {
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 1 });
   const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.8), mat);
@@ -468,7 +424,7 @@ function buildCeilingFixture(x, z) {
 }
 
 // ---- En-suite bathroom (suite layout): far-left corner of the bedroom -----
-function buildBathroom(group, colliders, walls, wallMat, back2) {
+function buildBathroom(group, colliders, walls, wallMat, fixtures, back2) {
   const x0 = -ROOM.w / 2, x1 = -1.8;        // x span
   const z1 = back2, z0 = back2 - 3.2;       // z span (against the far wall)
   const midX = (x0 + x1) / 2, midZ = (z0 + z1) / 2;
@@ -498,66 +454,15 @@ function buildBathroom(group, colliders, walls, wallMat, back2) {
   colliders.push({ minX: br, maxX: x1, minZ: z0 - t / 2, maxZ: z0 + t / 2 });
   walls.push({ x1: x0, z: z0, x2: bl }, { x1: br, z: z0, x2: x1 });
 
-  // Fixtures: toilet + sink along the left wall, shower in the far-right corner.
-  group.add(buildToilet(x0 + 0.55, z1 - 0.55));
-  group.add(buildSink(x0 + 0.45, midZ + 0.1));
-  colliders.push({ minX: x0, maxX: x0 + 1.0, minZ: z1 - 1.05, maxZ: z1 });
-  group.add(buildShower(x1 - 0.45, z1 - 0.45));
-  colliders.push({ minX: x1 - 0.9, maxX: x1, minZ: z1 - 0.9, maxZ: z1 });
+  // Movable fixtures: toilet + sink along the left wall, shower in the corner.
+  fixtures.push({ type: 'toilet', x: x0 + 0.55, z: z1 - 0.55, rot: 0 });
+  fixtures.push({ type: 'sink', x: x0 + 0.45, z: midZ + 0.1, rot: 0 });
+  fixtures.push({ type: 'shower', x: x1 - 0.45, z: z1 - 0.45, rot: 0 });
 
   const light = new THREE.PointLight('#eaf2ff', 7, 6, 2);
   light.position.set(midX, ROOM.h - 0.3, midZ);
   group.add(light);
   group.add(buildCeilingFixture(midX, midZ));
-}
-
-function buildToilet(x, z) {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: '#f4f6f7', roughness: 0.3 });
-  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.4, 20), mat);
-  bowl.position.y = 0.2; bowl.castShadow = true; g.add(bowl);
-  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 20), mat);
-  lid.position.y = 0.42; g.add(lid);
-  const tank = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.4, 0.18), mat);
-  tank.position.set(0, 0.6, -0.18); g.add(tank);
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function buildSink(x, z) {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: '#f4f6f7', roughness: 0.3 });
-  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.78, 16), mat);
-  pedestal.position.y = 0.39; g.add(pedestal);
-  const basin = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.34), mat);
-  basin.position.y = 0.82; basin.castShadow = true; g.add(basin);
-  const mirror = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.5),
-    new THREE.MeshStandardMaterial({ color: '#9fb8c8', roughness: 0.1, metalness: 0.6 }));
-  mirror.rotation.y = Math.PI / 2; mirror.position.set(-0.08, 1.45, 0); g.add(mirror);
-  g.position.set(x, 0, z);
-  return g;
-}
-
-// Corner shower: tray + two glass panels + a wall-mounted head. Centred on a
-// 0.9 m square footprint whose +x / +z sides are the room walls.
-function buildShower(x, z) {
-  const g = new THREE.Group();
-  const s = 0.9;
-  const tray = new THREE.Mesh(new THREE.BoxGeometry(s, 0.06, s),
-    new THREE.MeshStandardMaterial({ color: '#e7ebed', roughness: 0.3 }));
-  tray.position.y = 0.03; tray.receiveShadow = true; g.add(tray);
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: '#cfe0ea', transmission: 0.9, transparent: true, opacity: 0.3, roughness: 0.05, metalness: 0,
-  });
-  const panelF = new THREE.Mesh(new THREE.BoxGeometry(s, 1.95, 0.03), glassMat);
-  panelF.position.set(0, 1.0, -s / 2); g.add(panelF);          // panel facing -z
-  const panelL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 1.95, s), glassMat);
-  panelL.position.set(-s / 2, 1.0, 0); g.add(panelL);          // panel facing -x
-  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 16),
-    new THREE.MeshStandardMaterial({ color: '#c9ccce', metalness: 0.8, roughness: 0.3 }));
-  head.position.set(s / 2 - 0.08, 1.95, s / 2 - 0.08); g.add(head);
-  g.position.set(x, 0, z);
-  return g;
 }
 
 // Open kitchen run along the living-room left wall (x = -w/2), present in every

@@ -46,6 +46,10 @@ const furniture = buildFurniture(scene);
 // Outdoor atmosphere: sky, smooth day/night, weather, seasons.
 const environment = createEnvironment({ scene, renderer, lights, room, env: envTexture });
 
+// Drop each layout's bedroom/bathroom furniture in as movable, pick-up-able
+// pieces (a shared link, applied later, overrides these defaults).
+for (const f of room.fixtures) furniture.addItem(f.type, f.x, f.z, f.rot);
+
 const player = new Player(camera, renderer.domElement, {
   // Furniture footprints plus static obstacles (interior walls, bed).
   getColliders: () => furniture.getColliders().concat(room.colliders),

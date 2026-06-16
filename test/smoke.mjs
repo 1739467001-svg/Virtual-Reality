@@ -34,6 +34,13 @@ assert.ok(ROOM.w > 0 && ROOM.h > 0, 'room dimensions set');
 assert.ok(BOUNDS.maxX > BOUNDS.minX, 'bounds valid');
 assert.ok(Array.isArray(room.colliders) && room.floorplan && room.floorplan.ext, 'room exposes colliders + floorplan');
 assert.ok(Array.isArray(room.rooms) && room.rooms[0].w > 0, 'room exposes room rectangles for dimensions');
+assert.ok(Array.isArray(room.fixtures), 'room exposes movable fixtures');
+// The suite drops bedroom + bathroom items in as movable fixtures.
+const suiteTypes = buildRoom(new THREE.Scene(), 'suite').fixtures.map((f) => f.type);
+assert.ok(suiteTypes.length >= 5, 'suite places bed/nightstand + bathroom fixtures');
+for (const ty of ['bed', 'nightstand', 'toilet', 'sink', 'shower']) {
+  assert.ok(suiteTypes.includes(ty), `suite includes a ${ty}`);
+}
 room.setWallColor('#b9c7cf');
 for (const t of room.themes) room.setFloorTheme(t);
 // Swappable wall art + kitchen colour cycle through all variants.
@@ -116,6 +123,12 @@ for (const t of furniture.catalogTypes) assert.ok(furniture.addItem(t, 0, 0), `a
 assert.strictEqual(furniture.getMovable().length, before + furniture.catalogTypes.length, 'items added');
 const added = furniture.getMovable().find((p) => p.removable);
 assert.ok(furniture.removeItem(added), 'removeItem works');
+
+// Room fixtures are buildable + movable like any catalogue piece.
+for (const ty of ['nightstand', 'wardrobe', 'toilet', 'sink', 'shower']) {
+  const f = furniture.addItem(ty, 0, 0);
+  assert.ok(f && f.movable && f.removable, `fixture ${ty} is a movable piece`);
+}
 
 // addItem honours an explicit rotation (used to restore shared layouts).
 const rotated = furniture.addItem('stool', 1, 1, 0.77);

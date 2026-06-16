@@ -640,6 +640,65 @@ function buildExtra(type) {
       g.add(chair(0, 0.62, 0), chair(0, -0.62, Math.PI), chair(0.85, 0, -Math.PI / 2), chair(-0.85, 0, Math.PI / 2));
       return { object: g, foot: { w: 1.9, d: 1.9 } };
     }
+    // ---- Room fixtures (placed per layout, but movable like everything else) --
+    case 'nightstand': {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.42), wood('#6b4a32'));
+      body.position.y = 0.25; g.add(body);
+      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.2, 20),
+        new THREE.MeshStandardMaterial({ color: '#d9c08a', emissive: '#ffcf86', emissiveIntensity: 0.5, roughness: 0.6 }));
+      shade.position.y = 0.72; g.add(shade);
+      return { object: g, foot: { w: 0.5, d: 0.42 } };
+    }
+    case 'wardrobe': {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.0, 0.56), wood('#6b4a2e'));
+      body.position.y = 1.0; g.add(body);
+      for (const sx of [-1, 1]) {
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.9, 0.02), wood('#7d5836'));
+        door.position.set(sx * 0.3, 1.0, 0.29); g.add(door);
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 12), metal('#caa84a'));
+        knob.position.set(sx * 0.08, 1.0, 0.31); g.add(knob);
+      }
+      return { object: g, foot: { w: 1.2, d: 0.56 } };
+    }
+    case 'toilet': {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: '#f4f6f7', roughness: 0.3 });
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.4, 20), mat);
+      bowl.position.y = 0.2; g.add(bowl);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 20), mat);
+      lid.position.y = 0.42; g.add(lid);
+      const tank = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.4, 0.18), mat);
+      tank.position.set(0, 0.6, -0.18); g.add(tank);
+      return { object: g, foot: { w: 0.46, d: 0.6 } };
+    }
+    case 'sink': {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: '#f4f6f7', roughness: 0.3 });
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.78, 16), mat);
+      ped.position.y = 0.39; g.add(ped);
+      const basin = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.34), mat);
+      basin.position.y = 0.82; g.add(basin);
+      const mirror = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.5),
+        new THREE.MeshStandardMaterial({ color: '#9fb8c8', roughness: 0.1, metalness: 0.6 }));
+      mirror.rotation.y = Math.PI / 2; mirror.position.set(-0.08, 1.45, 0); g.add(mirror);
+      return { object: g, foot: { w: 0.42, d: 0.34 } };
+    }
+    case 'shower': {
+      const g = new THREE.Group();
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.9),
+        new THREE.MeshStandardMaterial({ color: '#e7ebed', roughness: 0.3 }));
+      tray.position.y = 0.03; g.add(tray);
+      const glassMat = new THREE.MeshPhysicalMaterial({ color: '#cfe0ea', transmission: 0.9, transparent: true, opacity: 0.3, roughness: 0.05, metalness: 0 });
+      const pf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.95, 0.03), glassMat);
+      pf.position.set(0, 1.0, -0.45); g.add(pf);
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.03, 1.95, 0.9), glassMat);
+      pl.position.set(-0.45, 1.0, 0); g.add(pl);
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 16), metal('#c9ccce'));
+      head.position.set(0.37, 1.95, 0.37); g.add(head);
+      return { object: g, foot: { w: 0.9, d: 0.9 } };
+    }
     default:
       return null;
   }
