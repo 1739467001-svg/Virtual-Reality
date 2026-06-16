@@ -125,7 +125,7 @@ const added = furniture.getMovable().find((p) => p.removable);
 assert.ok(furniture.removeItem(added), 'removeItem works');
 
 // Room fixtures are buildable + movable like any catalogue piece.
-for (const ty of ['nightstand', 'wardrobe', 'toilet', 'sink', 'shower']) {
+for (const ty of ['nightstand', 'wardrobe', 'toilet', 'sink', 'shower', 'pottedPlant', 'vase']) {
   const f = furniture.addItem(ty, 0, 0);
   assert.ok(f && f.movable && f.removable, `fixture ${ty} is a movable piece`);
 }

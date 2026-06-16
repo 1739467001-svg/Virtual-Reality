@@ -2,7 +2,7 @@
 // opening and a door opening), baseboards, framed pictures and the exterior
 // view seen through the window.
 import * as THREE from 'three';
-import { makeWoodTexture, makeWallTexture, makePictureTexture, makeFabricTexture, makeClockTexture } from './textures.js';
+import { makeWoodTexture, makeWallTexture, makePictureTexture, makeFabricTexture, makeClockTexture, PICTURE_VARIANTS } from './textures.js';
 
 // The living room (dimensions unchanged across layouts; furniture & details
 // are all authored against this box centred on the origin).
@@ -49,7 +49,7 @@ const WOOD_THEMES = {
   grey: '#8d8d8d',
 };
 
-const PICTURE_SETS = 3;   // makePictureTexture has 3 art variants
+const PICTURE_SETS = PICTURE_VARIANTS;   // number of swappable artworks
 const KITCHEN_THEMES = [
   { cab: '#3f4a52', top: '#d9d9d2' },   // slate / light stone
   { cab: '#6b4a32', top: '#e8e2d6' },   // walnut / cream
@@ -70,7 +70,8 @@ export function buildRoom(scene, layout = LAYOUT) {
   const apartment = layout !== 'studio';
   const hasBath = layout === 'suite';
   const twoBed = layout === 'twoBed';
-  const colliders = [];   // static obstacles the player collides with (interior walls, bed)
+  const colliders = [];   // static obstacles the player collides with (interior walls)
+  const fixtures = [];    // movable items each layout drops in (placed by main.js)
 
   // ---- Floor -------------------------------------------------------------
   const woodTex = makeWoodTexture({ base: WOOD_THEMES.oak });
@@ -148,7 +149,9 @@ export function buildRoom(scene, layout = LAYOUT) {
     new THREE.MeshStandardMaterial({ color: '#8a7f6c', roughness: 1 }));
   mat0.rotation.x = -Math.PI / 2; mat0.position.set(2.2, 0.015, ROOM.d / 2 - 0.55); mat0.receiveShadow = true;
   group.add(mat0);                                   // doormat by the door
-  const lp = pottedPlant(1.25); lp.position.set(-4.4, 0, 3.4); group.add(lp);  // front-left corner
+  // Movable living-room accents.
+  fixtures.push({ type: 'pottedPlant', x: -4.4, z: 3.4, rot: 0 });   // front-left corner plant
+  fixtures.push({ type: 'vase', x: 4.4, z: 3.4, rot: 0 });           // front-right corner vase
 
   // ---- Open kitchen along the living-room left wall ---------------------
   const kitchen = buildKitchen(group, colliders);
@@ -162,7 +165,6 @@ export function buildRoom(scene, layout = LAYOUT) {
     ? { minX: -ROOM.w / 2, maxX: ROOM.w / 2, minZ: -ROOM.d / 2, maxZ: back2 }
     : { minX: -ROOM.w / 2, maxX: ROOM.w / 2, minZ: -ROOM.d / 2, maxZ: ROOM.d / 2 };
   const walls = [];                     // interior wall line segments for the minimap
-  const fixtures = [];                  // movable items each layout drops in (placed by main.js)
 
   if (apartment) {
     const cz = (divZ + back2) / 2;      // bedroom centre on z
@@ -225,12 +227,16 @@ export function buildRoom(scene, layout = LAYOUT) {
     bLamp.castShadow = true;
     group.add(bLamp);
     group.add(buildCeilingFixture(twoBed ? 2.5 : 0, cz));
-    // Framed art above the main bed (on the far wall, facing the room).
-    group.add(makePicture(2, new THREE.Vector3(3.5, 1.9, back2 - 0.08), Math.PI));
-    if (twoBed) group.add(makePicture(1, new THREE.Vector3(-3.4, 1.9, back2 - 0.08), Math.PI));
-    // Corner potted plant(s) for a lived-in feel.
-    const bp = pottedPlant(1); bp.position.set(4.5, 0, divZ + 0.7); group.add(bp);
-    if (twoBed) { const bp2 = pottedPlant(1); bp2.position.set(-4.5, 0, divZ + 0.7); group.add(bp2); }
+    // Framed art above the main bed — swappable (added to the wall-art set).
+    const bArt = makePicture(2, new THREE.Vector3(3.5, 1.9, back2 - 0.08), Math.PI);
+    group.add(bArt); picMats.push(bArt.userData.artMat);
+    if (twoBed) {
+      const bArt2 = makePicture(1, new THREE.Vector3(-3.4, 1.9, back2 - 0.08), Math.PI);
+      group.add(bArt2); picMats.push(bArt2.userData.artMat);
+    }
+    // Movable corner potted plant(s) for a lived-in feel.
+    fixtures.push({ type: 'pottedPlant', x: 4.5, z: divZ + 0.7, rot: 0 });
+    if (twoBed) fixtures.push({ type: 'pottedPlant', x: -4.5, z: divZ + 0.7, rot: 0 });
 
     if (hasBath) buildBathroom(group, colliders, walls, wallMat, fixtures, back2);
 

@@ -87,26 +87,47 @@ export function makeWallTexture(base = '#e8e2d6') {
 }
 
 // A simple framed picture for the walls.
+export const PICTURE_VARIANTS = 6;
 export function makePictureTexture(kind = 0) {
   const size = 256;
   const c = canvas(size);
   const ctx = c.getContext('2d');
-  const skies = [['#ff9a3c', '#ffd56b'], ['#4a90d9', '#a8d0f0'], ['#2c3e50', '#8e44ad']];
-  const [a, b] = skies[kind % skies.length];
-  const grad = ctx.createLinearGradient(0, 0, 0, size);
-  grad.addColorStop(0, a);
-  grad.addColorStop(1, b);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-  // Abstract hills / horizon.
-  ctx.fillStyle = 'rgba(20,40,30,0.7)';
-  ctx.beginPath();
-  ctx.moveTo(0, size * 0.7);
-  ctx.bezierCurveTo(size * 0.3, size * 0.55, size * 0.6, size * 0.8, size, size * 0.65);
-  ctx.lineTo(size, size);
-  ctx.lineTo(0, size);
-  ctx.closePath();
-  ctx.fill();
+  const k = ((Math.trunc(kind) % PICTURE_VARIANTS) + PICTURE_VARIANTS) % PICTURE_VARIANTS;
+  const vGrad = (a, b) => { const g = ctx.createLinearGradient(0, 0, 0, size); g.addColorStop(0, a); g.addColorStop(1, b); return g; };
+  const hills = (col) => {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.7);
+    ctx.bezierCurveTo(size * 0.3, size * 0.55, size * 0.6, size * 0.82, size, size * 0.65);
+    ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
+  };
+  if (k === 0) {                              // sunrise over hills
+    ctx.fillStyle = vGrad('#ff9a3c', '#ffd56b'); ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#fff2c0'; ctx.beginPath(); ctx.arc(size * 0.68, size * 0.34, 26, 0, 7); ctx.fill();
+    hills('rgba(40,60,45,0.8)');
+  } else if (k === 1) {                       // blue-sky hills
+    ctx.fillStyle = vGrad('#4a90d9', '#a8d0f0'); ctx.fillRect(0, 0, size, size); hills('#2f6e3f');
+  } else if (k === 2) {                       // purple dusk
+    ctx.fillStyle = vGrad('#2c3e50', '#8e44ad'); ctx.fillRect(0, 0, size, size); hills('#160e26');
+  } else if (k === 3) {                       // ocean horizon
+    ctx.fillStyle = vGrad('#bfe6f2', '#eaf7fb'); ctx.fillRect(0, 0, size, size * 0.58);
+    ctx.fillStyle = vGrad('#2a7fb0', '#1d5e86'); ctx.fillRect(0, size * 0.58, size, size * 0.42);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(20, size * (0.66 + i * 0.07)); ctx.lineTo(size - 20, size * (0.66 + i * 0.07)); ctx.stroke(); }
+  } else if (k === 4) {                       // forest
+    ctx.fillStyle = '#e3efd8'; ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#3f7d34';
+    for (let i = 0; i < 7; i++) {
+      const x = 20 + i * 34;
+      ctx.beginPath(); ctx.moveTo(x, size * 0.85); ctx.lineTo(x - 18, size * 0.85); ctx.lineTo(x, size * 0.3); ctx.lineTo(x + 18, size * 0.85); ctx.closePath(); ctx.fill();
+    }
+  } else {                                    // abstract colour blocks
+    const cols = ['#e74c3c', '#f1c40f', '#2980b9', '#27ae60', '#8e44ad', '#e67e22'];
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = cols[i];
+      ctx.fillRect((i % 3) * (size / 3), Math.floor(i / 3) * (size / 2), size / 3, size / 2);
+    }
+  }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;

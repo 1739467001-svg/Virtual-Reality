@@ -19,11 +19,11 @@ const RUG_COLORS = [['#c0392b', '#922b21'], ['#2c6e8f', '#1f4e63'], ['#caa94a', 
 
 // Catalogue of items the user can add to / remove from the room. The "real*"
 // entries are real glTF models registered asynchronously at runtime.
-const CATALOG = ['realSofa', 'realChair', 'realVase', 'realLamp', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'bed', 'diningSet', 'floorLamp', 'sideboard'];
+const CATALOG = ['realSofa', 'realChair', 'realVase', 'realLamp', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'vase', 'bed', 'diningSet', 'floorLamp', 'sideboard'];
 const CATALOG_LABELS = {
   realSofa: '真皮沙发 Sofa·3D', realChair: '锦缎单椅 Chair·3D', realVase: '花瓶花艺 Vase·3D',
   realLamp: '真实灯具 Lantern·3D', armchair: '扶手椅 Armchair', stool: '凳子 Stool', sideTable: '边几 Side table',
-  pouf: '坐墩 Pouf', plant: '绿植 Plant', bed: '床 Bed', diningSet: '餐桌椅 Dining set',
+  pouf: '坐墩 Pouf', plant: '绿植 Plant', vase: '花瓶摆件 Vase', bed: '床 Bed', diningSet: '餐桌椅 Dining set',
   floorLamp: '落地灯 Lamp', sideboard: '边柜 Sideboard',
 };
 // type -> { object: Object3D template, foot } for loaded glTF models.
@@ -639,6 +639,38 @@ function buildExtra(type) {
       };
       g.add(chair(0, 0.62, 0), chair(0, -0.62, Math.PI), chair(0.85, 0, -Math.PI / 2), chair(-0.85, 0, Math.PI / 2));
       return { object: g, foot: { w: 1.9, d: 1.9 } };
+    }
+    // ---- Decorative accents (placeable + pick-up-able) --------------------
+    case 'vase': {
+      const g = new THREE.Group();
+      const cer = new THREE.MeshStandardMaterial({ color: pick(['#d9c7b8', '#7fa1a8', '#c98b6b', '#3f4a52']), roughness: 0.35 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.06, 0.28, 18), cer);
+      body.position.y = 0.14; body.castShadow = true; g.add(body);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.1, 18), cer);
+      neck.position.y = 0.32; g.add(neck);
+      const stemMat = new THREE.MeshStandardMaterial({ color: '#4f8a3a', roughness: 0.9 });
+      const blooms = ['#e26d8a', '#e7b84b', '#9c6bd6'];
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.32), stemMat);
+        stem.position.set(Math.cos(a) * 0.04, 0.52, Math.sin(a) * 0.04);
+        stem.rotation.set(Math.sin(a) * 0.25, 0, -Math.cos(a) * 0.25); g.add(stem);
+        const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 10), new THREE.MeshStandardMaterial({ color: blooms[i], roughness: 0.7 }));
+        bloom.position.set(Math.cos(a) * 0.1, 0.66, Math.sin(a) * 0.1); g.add(bloom);
+      }
+      return { object: g, foot: { w: 0.26, d: 0.26 } };
+    }
+    case 'pottedPlant': {
+      const g = new THREE.Group();
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.28, 16), new THREE.MeshStandardMaterial({ color: '#b5651d', roughness: 0.8 }));
+      pot.position.y = 0.14; pot.castShadow = true; g.add(pot);
+      const fol = new THREE.MeshStandardMaterial({ color: '#3f7d34', roughness: 0.9 });
+      for (let i = 0; i < 3; i++) {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), fol);
+        leaf.position.set((i - 1) * 0.1, 0.42 + i * 0.13, (1 - i) * 0.07);
+        leaf.scale.y = 1.4; leaf.castShadow = true; g.add(leaf);
+      }
+      return { object: g, foot: { w: 0.32, d: 0.32 } };
     }
     // ---- Room fixtures (placed per layout, but movable like everything else) --
     case 'nightstand': {
