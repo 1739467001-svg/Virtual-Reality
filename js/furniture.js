@@ -19,11 +19,12 @@ const RUG_COLORS = [['#c0392b', '#922b21'], ['#2c6e8f', '#1f4e63'], ['#caa94a', 
 
 // Catalogue of items the user can add to / remove from the room. The "real*"
 // entries are real glTF models registered asynchronously at runtime.
-const CATALOG = ['realSofa', 'realChair', 'realVase', 'realLamp', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'vase', 'bed', 'diningSet', 'floorLamp', 'sideboard'];
+const CATALOG = ['realSofa', 'realChair', 'realVase', 'realLamp', 'armchair', 'stool', 'sideTable', 'pouf', 'plant', 'vase', 'books', 'frame', 'globe', 'candle', 'bed', 'diningSet', 'floorLamp', 'sideboard'];
 const CATALOG_LABELS = {
   realSofa: '真皮沙发 Sofa·3D', realChair: '锦缎单椅 Chair·3D', realVase: '花瓶花艺 Vase·3D',
   realLamp: '真实灯具 Lantern·3D', armchair: '扶手椅 Armchair', stool: '凳子 Stool', sideTable: '边几 Side table',
-  pouf: '坐墩 Pouf', plant: '绿植 Plant', vase: '花瓶摆件 Vase', bed: '床 Bed', diningSet: '餐桌椅 Dining set',
+  pouf: '坐墩 Pouf', plant: '绿植 Plant', vase: '花瓶摆件 Vase', books: '书籍 Books', frame: '相框 Frame',
+  globe: '地球仪 Globe', candle: '蜡烛 Candles', bed: '床 Bed', diningSet: '餐桌椅 Dining set',
   floorLamp: '落地灯 Lamp', sideboard: '边柜 Sideboard',
 };
 // type -> { object: Object3D template, foot } for loaded glTF models.
@@ -671,6 +672,58 @@ function buildExtra(type) {
         leaf.scale.y = 1.4; leaf.castShadow = true; g.add(leaf);
       }
       return { object: g, foot: { w: 0.32, d: 0.32 } };
+    }
+    case 'books': {                          // a small leaning stack of books
+      const g = new THREE.Group();
+      const cols = ['#8c3b3b', '#3b5a8c', '#3b7d4f', '#caa94a', '#6d4c7d'];
+      let y = 0;
+      for (let i = 0; i < 4; i++) {
+        const w = 0.22 + Math.random() * 0.06, h = 0.04 + Math.random() * 0.02, d = 0.16 + Math.random() * 0.04;
+        const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: cols[i % cols.length], roughness: 0.7 }));
+        b.position.set((Math.random() - 0.5) * 0.02, y + h / 2, (Math.random() - 0.5) * 0.02);
+        b.rotation.y = (Math.random() - 0.5) * 0.25; b.castShadow = true; g.add(b); y += h;
+      }
+      return { object: g, foot: { w: 0.3, d: 0.24 } };
+    }
+    case 'frame': {                          // a standing photo frame
+      const g = new THREE.Group();
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.02), wood('#3b2a17'));
+      frame.position.y = 0.16; frame.castShadow = true; g.add(frame);
+      const photo = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.24),
+        new THREE.MeshStandardMaterial({ map: makePictureTexture(Math.floor(Math.random() * 6)), roughness: 0.6 }));
+      photo.position.set(0, 0.16, 0.012); g.add(photo);
+      const stand = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.13, 0.02), wood('#3b2a17'));
+      stand.position.set(0, 0.06, -0.04); stand.rotation.x = 0.3; g.add(stand);
+      return { object: g, foot: { w: 0.26, d: 0.14 } };
+    }
+    case 'globe': {                          // desk globe on a stand
+      const g = new THREE.Group();
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 16),
+        new THREE.MeshStandardMaterial({ color: '#3a6ea5', roughness: 0.5, metalness: 0.1 }));
+      ball.position.y = 0.32; ball.castShadow = true; g.add(ball);
+      const land = new THREE.MeshStandardMaterial({ color: '#5a8f4a', roughness: 0.7 });
+      for (const [ax, ay, az] of [[0.06, 0.36, 0.08], [-0.07, 0.3, 0.05], [0.02, 0.4, -0.07]]) {
+        const patch = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), land);
+        patch.position.set(ax, ay, az); patch.scale.set(1.2, 0.7, 1); g.add(patch);
+      }
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.008, 8, 24), metal('#c9a24a'));
+      ring.position.y = 0.32; ring.rotation.x = 0.4; g.add(ring);
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.06, 0.2, 12), wood('#5a3a22'));
+      stand.position.y = 0.1; g.add(stand);
+      return { object: g, foot: { w: 0.28, d: 0.28 } };
+    }
+    case 'candle': {                         // a trio of candles
+      const g = new THREE.Group();
+      for (let i = 0; i < 3; i++) {
+        const h = 0.12 + i * 0.05;
+        const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, h, 12),
+          new THREE.MeshStandardMaterial({ color: '#efe7d6', roughness: 0.6, emissive: '#ffcf86', emissiveIntensity: 0.12 }));
+        wax.position.set((i - 1) * 0.08, h / 2, 0); g.add(wax);
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.04, 8),
+          new THREE.MeshStandardMaterial({ color: '#ffd27a', emissive: '#ffb347', emissiveIntensity: 1.2 }));
+        flame.position.set((i - 1) * 0.08, h + 0.02, 0); g.add(flame);
+      }
+      return { object: g, foot: { w: 0.3, d: 0.12 } };
     }
     // ---- Room fixtures (placed per layout, but movable like everything else) --
     case 'nightstand': {
