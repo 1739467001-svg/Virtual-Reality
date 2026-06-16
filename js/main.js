@@ -164,6 +164,17 @@ dimsBtn.addEventListener('click', () => {
   dimsBtn.querySelector('.state').textContent = dimsGroup.visible ? 'ON' : 'OFF';
 });
 
+// ---- Crouch / stand (C key + on-screen toggle) ---------------------------
+const crouchBtn = document.getElementById('btn-crouch');
+const syncCrouch = () => {
+  crouchBtn.classList.toggle('on', player.crouch);
+  crouchBtn.querySelector('.state').textContent = player.crouch ? 'ON' : 'OFF';
+};
+crouchBtn.addEventListener('click', () => { player.toggleCrouch(); syncCrouch(); });
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyC' && !e.repeat) { player.toggleCrouch(); syncCrouch(); }
+});
+
 // ---- Real glTF furniture models ------------------------------------------
 // Light models are preloaded; heavy ones (lantern, ~9 MB) load on first add.
 const gltfLoader = new GLTFLoader();

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { BOUNDS } from './room.js';
 
 const EYE = 1.65;
+const CROUCH_EYE = 0.85;   // crouched eye height (peek under tables / at bedding)
 const RADIUS = 0.3;
 const WALK = 3.0;
 const RUN = 5.4;
@@ -22,6 +23,8 @@ export class Player {
     this.moveInput = { x: 0, y: 0 }; // touch joystick: x=strafe, y=forward
     this.locked = false;
     this.xrPresenting = false;
+    this.crouch = false;
+    this.eyeHeight = EYE;        // animated toward EYE / CROUCH_EYE
 
     camera.position.set(2.2, EYE, 3.0); // just inside the door
     camera.rotation.order = 'YXZ';
@@ -29,6 +32,8 @@ export class Player {
 
     this._bind();
   }
+
+  toggleCrouch() { this.crouch = !this.crouch; return this.crouch; }
 
   _bind() {
     // Keyboard.
@@ -116,20 +121,24 @@ export class Player {
     f += this.moveInput.y;
     s += this.moveInput.x;
 
-    if (f === 0 && s === 0) return;
+    // Crouch / stand: animate eye height every frame (even when standing still).
+    const targetEye = this.crouch ? CROUCH_EYE : EYE;
+    this.eyeHeight += (targetEye - this.eyeHeight) * Math.min(1, dt * 10);
 
-    let dx = fwdX * f + rightX * s;
-    let dz = fwdZ * f + rightZ * s;
-    const len = Math.hypot(dx, dz);
-    if (len > 1) { dx /= len; dz /= len; }
+    if (f !== 0 || s !== 0) {
+      let dx = fwdX * f + rightX * s;
+      let dz = fwdZ * f + rightZ * s;
+      const len = Math.hypot(dx, dz);
+      if (len > 1) { dx /= len; dz /= len; }
 
-    const speed = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? RUN : WALK;
-    dx *= speed * dt;
-    dz *= speed * dt;
+      const speed = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? RUN : WALK;
+      dx *= speed * dt;
+      dz *= speed * dt;
 
-    const p = this.camera.position;
-    if (!this._collides(p.x + dx, p.z)) p.x += dx;
-    if (!this._collides(p.x, p.z + dz)) p.z += dz;
-    p.y = EYE;
+      const p = this.camera.position;
+      if (!this._collides(p.x + dx, p.z)) p.x += dx;
+      if (!this._collides(p.x, p.z + dz)) p.z += dz;
+    }
+    this.camera.position.y = this.eyeHeight;
   }
 }

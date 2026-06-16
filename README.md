@@ -41,6 +41,7 @@ it runs from any static host (or opened straight as `index.html`).
 | 前后左右移动 Move | `W` `A` `S` `D` / 方向键 Arrow keys |
 | 转动视角 Look | 移动鼠标 Mouse (点击进入后锁定指针) |
 | 快走 Run | `Shift` |
+| 下蹲 / 起身 Crouch | `C`（或面板按钮）—— 蹲下看桌下 / 床品细节 |
 | 释放鼠标 Release cursor | `Esc` |
 | 切换灯光 / 家具 / 装修 | 右上角控制面板 Panel (top-right) |
 | 移动家具 Move furniture | 面板开启移动模式后，点击拾起 / 放下 |
