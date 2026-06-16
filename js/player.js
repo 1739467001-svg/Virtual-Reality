@@ -7,6 +7,8 @@ import { BOUNDS } from './room.js';
 
 const EYE = 1.65;
 const CROUCH_EYE = 0.85;   // crouched eye height (peek under tables / at bedding)
+const CROUCH_SPEED = 0.5;  // movement speed multiplier while crouched
+const CROUCH_TILT = -0.13; // slight downward head tilt while crouched (rad)
 const RADIUS = 0.3;
 const WALK = 3.0;
 const RUN = 5.4;
@@ -25,6 +27,7 @@ export class Player {
     this.xrPresenting = false;
     this.crouch = false;
     this.eyeHeight = EYE;        // animated toward EYE / CROUCH_EYE
+    this.crouchTilt = 0;         // animated head tilt while crouched
 
     camera.position.set(2.2, EYE, 3.0); // just inside the door
     camera.rotation.order = 'YXZ';
@@ -92,7 +95,9 @@ export class Player {
 
   _applyLook() {
     if (this.xrPresenting) return;
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    const lim = Math.PI / 2 - 0.05;
+    const pitch = Math.max(-lim, Math.min(lim, this.pitch + this.crouchTilt));
+    this.camera.rotation.set(pitch, this.yaw, 0, 'YXZ');
   }
 
   collides(x, z) { return this._collides(x, z); }
@@ -121,9 +126,12 @@ export class Player {
     f += this.moveInput.y;
     s += this.moveInput.x;
 
-    // Crouch / stand: animate eye height every frame (even when standing still).
-    const targetEye = this.crouch ? CROUCH_EYE : EYE;
-    this.eyeHeight += (targetEye - this.eyeHeight) * Math.min(1, dt * 10);
+    // Crouch / stand: animate eye height + a slight head tilt every frame
+    // (even when standing still).
+    const k = Math.min(1, dt * 10);
+    this.eyeHeight += ((this.crouch ? CROUCH_EYE : EYE) - this.eyeHeight) * k;
+    this.crouchTilt += ((this.crouch ? CROUCH_TILT : 0) - this.crouchTilt) * k;
+    this._applyLook();
 
     if (f !== 0 || s !== 0) {
       let dx = fwdX * f + rightX * s;
@@ -131,7 +139,8 @@ export class Player {
       const len = Math.hypot(dx, dz);
       if (len > 1) { dx /= len; dz /= len; }
 
-      const speed = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? RUN : WALK;
+      let speed = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? RUN : WALK;
+      if (this.crouch) speed *= CROUCH_SPEED;     // move slower while crouched
       dx *= speed * dt;
       dz *= speed * dt;
 
