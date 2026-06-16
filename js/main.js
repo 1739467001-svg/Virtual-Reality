@@ -293,16 +293,20 @@ function createMover() {
   const probe = new THREE.Vector3();
   const ITEM_COLORS = ['#c0563f', '#3d6b8f', '#6b8f5e', '#caa94a', '#7d5a86', '#4a4f57', '#d7cfc2'];
   let colorIdx = -1;
-  let liftOffset = 0;          // extra height above the surface the item rests on
+  let carryY = 0;              // current "aim" height; item rests on nearest surface ≤ this
+  let userLift = false;        // true once the user adjusts height (else auto-rest on top)
   let active = false;
   let selected = null;
 
   const isUnder = (obj, ancestor) => { for (let o = obj; o; o = o.parent) if (o === ancestor) return true; return false; };
-  const surfaceYAt = (x, z) => {
+  // Surface heights under (x,z), highest first (floor included), excluding the held item.
+  const surfacesAt = (x, z) => {
     downRay.set(probe.set(x, 2.9, z), DOWN);
-    const hits = downRay.intersectObjects([furniture.group, room.group], true);
-    for (const h of hits) if (!isUnder(h.object, selected.holder)) return h.point.y;
-    return 0;
+    const ys = [];
+    for (const h of downRay.intersectObjects([furniture.group, room.group], true)) {
+      if (!isUnder(h.object, selected.holder)) ys.push(h.point.y);
+    }
+    return ys;
   };
 
   const api = {
@@ -324,8 +328,15 @@ function createMover() {
       const tz = camera.position.z + fz * HOLD_DIST;
       selected.holder.position.x = clamp(tx, FBOUNDS.minX + hw, FBOUNDS.maxX - hw);
       selected.holder.position.z = clamp(tz, FBOUNDS.minZ + hd, FBOUNDS.maxZ - hd);
-      // Rest on whatever surface is beneath (floor / table / bed / shelf) + lift.
-      selected.holder.position.y = surfaceYAt(selected.holder.position.x, selected.holder.position.z) + liftOffset;
+      // Rest on the nearest surface at/below the aim height. By default the aim
+      // tracks the topmost surface (auto-climb onto tables / stack on items);
+      // lowering the aim drops it to the next surface down (e.g. under a table).
+      const ys = surfacesAt(selected.holder.position.x, selected.holder.position.z);
+      const topmost = ys.length ? ys[0] : 0;
+      if (!userLift) carryY = topmost;
+      let restY = 0;
+      for (const y of ys) if (y <= carryY + 0.06) { restY = y; break; }
+      selected.holder.position.y = restY;
     },
     // Rotate the held piece (on-screen buttons + Q/E keys).
     rotate(delta) {
@@ -347,11 +358,12 @@ function createMover() {
       const s = furniture.setItemScale(selected, selected.scale * f);
       announce('缩放 Scale ×' + s.toFixed(2));
     },
-    // Raise / lower the held piece above the surface it rests on.
+    // Raise / lower the aim height; the piece snaps to the nearest surface ≤ aim.
     lift(delta) {
       if (!active || !selected) { announce('先拾起家具再调高度 · Pick up a piece first'); return; }
-      liftOffset = clamp(liftOffset + delta, 0, 2.5);
-      announce('高度 Lift +' + liftOffset.toFixed(2) + 'm · 自动吸附台面 · auto-rests on surfaces');
+      userLift = true;
+      carryY = clamp(carryY + delta, 0, 3);
+      announce('高度 Aim ' + carryY.toFixed(2) + 'm · 吸附最近台面 · snaps to nearest surface below');
     },
   };
 
@@ -400,7 +412,7 @@ function createMover() {
       const p = pick();
       if (p) {
         selected = p;
-        liftOffset = 0;
+        carryY = 0; userLift = false;   // auto-rest on the topmost surface beneath
         announce('拾起 Holding — 走动/转身摆放，自动吸附台面；R/F 或滚轮调高度，Q/E 旋转，再次点击放下');
       }
     }
