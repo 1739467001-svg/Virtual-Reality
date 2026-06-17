@@ -236,9 +236,16 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
     catch (e) { /* ignore malformed link */ }
   }
 
-  // ---- Panel collapse ----------------------------------------------------
+  // ---- Panel collapse + collapsible sections (accordion) -----------------
   $('btn-collapse').addEventListener('click', () => {
     $('panel').classList.toggle('collapsed');
+  });
+  const sections = [...document.querySelectorAll('#panel section')];
+  const smallScreen = matchMedia('(max-width: 600px)').matches;
+  sections.forEach((sec) => {
+    const title = sec.querySelector('.sec-title');
+    if (title) title.addEventListener('click', () => sec.classList.toggle('folded'));
+    if (smallScreen) sec.classList.add('folded');   // start compact on phones
   });
 
   // ---- Touch joystick ----------------------------------------------------
