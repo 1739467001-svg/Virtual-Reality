@@ -224,7 +224,7 @@ export function buildRoom(scene, layout = LAYOUT) {
 
     const bLamp = new THREE.PointLight('#ffe3b8', 14, 9, 2);
     bLamp.position.set(twoBed ? 2.5 : 0, ROOM.h - 0.35, cz);
-    bLamp.castShadow = true;
+    bLamp.castShadow = false;   // secondary light — no shadow map (perf)
     group.add(bLamp);
     group.add(buildCeilingFixture(twoBed ? 2.5 : 0, cz));
     // Framed art above the main bed — swappable (added to the wall-art set).
@@ -256,7 +256,7 @@ export function buildRoom(scene, layout = LAYOUT) {
       fixtures.push({ type: 'bed', x: -3.4, z: back2 - 1.6, rot: Math.PI });
       fixtures.push({ type: 'nightstand', x: -2.1, z: back2 - 0.6, rot: 0 });
       const bLamp2 = new THREE.PointLight('#ffe3b8', 13, 8, 2);
-      bLamp2.position.set(-2.5, ROOM.h - 0.35, cz); bLamp2.castShadow = true;
+      bLamp2.position.set(-2.5, ROOM.h - 0.35, cz);   // no shadow map (perf)
       group.add(bLamp2);
       group.add(buildCeilingFixture(-2.5, cz));
     }

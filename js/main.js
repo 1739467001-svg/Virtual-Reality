@@ -309,17 +309,42 @@ function createMover() {
     return ys;
   };
 
+  // Outline shown around the hovered (yellow) / held (green) piece; red on overlap.
+  const highlight = new THREE.BoxHelper(new THREE.Object3D(), 0xffd24a);
+  highlight.material.depthTest = false; highlight.material.transparent = true;
+  highlight.renderOrder = 997; highlight.visible = false;
+  scene.add(highlight);
+
+  // True if `piece`'s footprint overlaps any other furniture/wall (slightly inset
+  // so merely touching doesn't warn).
+  function overlaps(piece) {
+    const x = piece.holder.position.x, z = piece.holder.position.z;
+    const hw = piece.foot.w / 2 - 0.06, hd = piece.foot.d / 2 - 0.06;
+    const a = { minX: x - hw, maxX: x + hw, minZ: z - hd, maxZ: z + hd };
+    for (const b of furniture.getColliders(0, piece).concat(room.colliders)) {
+      if (a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ) return true;
+    }
+    return false;
+  }
+
   const api = {
     active,
     onChange: null,
     toggle() {
       active = !active;
       api.active = active;
-      if (!active) drop();
+      if (!active) { drop(); highlight.visible = false; }
       else announce('移动模式：走近家具点击拾起 · Move mode: click a piece to pick up');
     },
     update() {
-      if (!active || !selected) return;
+      if (!active) { highlight.visible = false; return; }
+      if (!selected) {
+        // Hover highlight on the piece under the crosshair.
+        const h = pick();
+        if (h) { highlight.setFromObject(h.holder); highlight.material.color.setHex(0xffd24a); highlight.visible = true; }
+        else highlight.visible = false;
+        return;
+      }
       // Carry the piece a fixed distance in front of the player, so turning
       // sweeps it left/right and walking carries it — at any view angle.
       const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
@@ -337,6 +362,10 @@ function createMover() {
       let restY = 0;
       for (const y of ys) if (y <= carryY + 0.06) { restY = y; break; }
       selected.holder.position.y = restY;
+      // Held outline: green normally, red when overlapping another piece/wall.
+      highlight.setFromObject(selected.holder);
+      highlight.material.color.setHex(overlaps(selected) ? 0xe0533f : 0x6be36b);
+      highlight.visible = true;
     },
     // Rotate the held piece (on-screen buttons + Q/E keys).
     rotate(delta) {

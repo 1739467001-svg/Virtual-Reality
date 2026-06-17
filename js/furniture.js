@@ -142,8 +142,8 @@ export function buildFurniture(scene) {
   ];
   chairHolder.add(enableShadows(buildArmchair(SOFA_COLORS[(state.sofaColor + 2) % SOFA_COLORS.length])));
 
-  function getColliders(extraPadding = 0) {
-    return pieces.map((p) => {
+  function getColliders(extraPadding = 0, exclude = null) {
+    return pieces.filter((p) => p !== exclude).map((p) => {
       const obj = p.holder || p.group;
       const x = obj.position.x, z = obj.position.z;
       const hw = p.foot.w / 2 + extraPadding;

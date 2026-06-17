@@ -148,9 +148,7 @@ function buildFloorLamp() {
 
   const light = new THREE.PointLight('#ffd98a', 16, 0, 2);
   light.position.set(0, 1.6, 0);
-  light.castShadow = true;
-  light.shadow.mapSize.set(1024, 1024);
-  light.shadow.bias = -0.001;
+  // Secondary accent light — no shadow map (the sun + ceiling cast shadows).
   group.add(light);
 
   function setOn(on) {
