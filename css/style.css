@@ -151,6 +151,28 @@ section.folded .btn,
 section.folded .row2,
 section.folded .slider { display: none; }
 
+/* Bottom-sheet pieces — hidden on desktop, shown via the mobile media query. */
+.sheet-handle, #panel-tabs, #panel-fab, #sheet-backdrop { display: none; }
+#panel-tabs { gap: 6px; overflow-x: auto; padding: 2px 2px 8px; -webkit-overflow-scrolling: touch; }
+.ptab {
+  flex: 0 0 auto; min-width: 42px; height: 38px; padding: 0 8px;
+  border-radius: 10px; background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border); color: var(--text); font-size: 17px; cursor: pointer;
+}
+.ptab.active { background: var(--accent); color: #06121f; }
+.sheet-handle { width: 42px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.32); margin: 8px auto 2px; }
+#panel-fab {
+  position: fixed; right: 16px; bottom: 18px; z-index: 9;
+  padding: 11px 17px; border-radius: 999px; border: 1px solid var(--panel-border);
+  background: rgba(16, 20, 28, 0.88); color: var(--text); font-size: 14px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); cursor: pointer;
+}
+#sheet-backdrop {
+  position: fixed; inset: 0; z-index: 9; background: rgba(0, 0, 0, 0.35);
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+#sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+
 .btn {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%; margin: 6px 0;
@@ -256,9 +278,19 @@ section.folded .slider { display: none; }
 /* Tablet */
 @media (max-width: 900px) { #panel { width: 232px; } }
 
-/* Phone: narrower panel, scrolls within the viewport; sections start folded. */
+/* Phone: control panel becomes a bottom sheet opened by a ☰ launcher. */
 @media (max-width: 600px) {
-  #panel { width: min(74vw, 240px); top: 8px; right: 8px; max-height: calc(100svh - 16px); }
+  #panel {
+    top: auto; bottom: 0; left: 0; right: 0; width: 100%; z-index: 11;
+    max-height: 82svh; border-radius: 18px 18px 0 0; padding-bottom: 16px;
+    transform: translateY(100%); transition: transform 0.3s ease;
+  }
+  #panel.open { transform: translateY(0); }
+  .sheet-handle { display: block; }
+  #panel-tabs { display: flex; }
+  #panel-fab { display: block; }
+  #sheet-backdrop { display: block; }
+  #panel.open ~ #panel-fab { display: none; }
   #overlay .card { padding: 24px 20px; }
   #btn-help { top: 130px; }
 }

@@ -236,17 +236,56 @@ export function setupUI({ room, lights, furniture, player, mover, environment })
     catch (e) { /* ignore malformed link */ }
   }
 
-  // ---- Panel collapse + collapsible sections (accordion) -----------------
-  $('btn-collapse').addEventListener('click', () => {
-    $('panel').classList.toggle('collapsed');
-  });
+  // ---- Panel: collapsible sections (desktop) / bottom sheet (mobile) -----
+  const panel = $('panel');
   const sections = [...document.querySelectorAll('#panel section')];
   const smallScreen = matchMedia('(max-width: 600px)').matches;
+
+  // Every section title folds / unfolds its section (accordion).
   sections.forEach((sec) => {
     const title = sec.querySelector('.sec-title');
     if (title) title.addEventListener('click', () => sec.classList.toggle('folded'));
-    if (smallScreen) sec.classList.add('folded');   // start compact on phones
   });
+
+  $('btn-collapse').addEventListener('click', () => {
+    if (smallScreen) panel.classList.remove('open');   // ✕ closes the sheet
+    else panel.classList.toggle('collapsed');
+  });
+
+  if (smallScreen) {
+    // Turn the panel into an app-style bottom sheet with a ☰ launcher + tabs.
+    const handle = document.createElement('div'); handle.className = 'sheet-handle';
+    panel.insertBefore(handle, panel.firstChild);
+    const tabs = document.createElement('nav'); tabs.id = 'panel-tabs';
+    panel.insertBefore(tabs, panel.querySelector('section'));
+    const fab = document.createElement('button'); fab.id = 'panel-fab'; fab.textContent = '☰ 菜单';
+    const backdrop = document.createElement('div'); backdrop.id = 'sheet-backdrop';
+    document.body.append(fab, backdrop);
+
+    const openSheet = () => { panel.classList.add('open'); backdrop.classList.add('show'); };
+    const closeSheet = () => { panel.classList.remove('open'); backdrop.classList.remove('show'); };
+    fab.addEventListener('click', openSheet);
+    handle.addEventListener('click', closeSheet);
+    backdrop.addEventListener('click', closeSheet);
+
+    const chips = sections.map((sec) => {
+      const label = (sec.querySelector('.sec-title')?.textContent || '·').trim();
+      const chip = document.createElement('button');
+      chip.className = 'ptab'; chip.textContent = label.split(/\s+/)[0] || '·';
+      chip.title = label;
+      chip.addEventListener('click', () => {
+        sections.forEach((s) => s.classList.add('folded'));
+        sec.classList.remove('folded');
+        chips.forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        sec.scrollIntoView({ block: 'start' });
+      });
+      tabs.appendChild(chip);
+      return chip;
+    });
+    sections.forEach((s) => s.classList.add('folded'));   // start folded
+    if (chips[0]) { chips[0].classList.add('active'); sections[0].classList.remove('folded'); }
+  }
 
   // ---- Touch joystick ----------------------------------------------------
   if (isTouch) {
