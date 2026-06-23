@@ -14,6 +14,7 @@ import { Player } from './player.js';
 import { setupUI } from './ui.js';
 import { createMinimap } from './minimap.js';
 import { createEnvironment } from './environment.js';
+import { createAmbience } from './audio.js';
 
 // ---- Renderer ------------------------------------------------------------
 const canvas = document.getElementById('app');
@@ -176,6 +177,24 @@ crouchBtn.addEventListener('click', () => { player.toggleCrouch(); syncCrouch();
 addEventListener('keydown', (e) => {
   if (e.code === 'KeyC' && !e.repeat) { player.toggleCrouch(); syncCrouch(); }
 });
+
+// ---- Background music (generative ambient, starts on first gesture) ------
+const ambience = createAmbience();
+let soundOn = true;
+try { soundOn = localStorage.getItem('vh_muted') !== '1'; } catch { /* ignore */ }
+const soundBtn = document.getElementById('btn-sound');
+const syncSound = () => { soundBtn.textContent = soundOn ? '🔊' : '🔇'; soundBtn.classList.toggle('on', soundOn); };
+syncSound();
+soundBtn.addEventListener('click', () => {
+  soundOn = !soundOn;
+  ambience.setMuted(!soundOn);
+  try { localStorage.setItem('vh_muted', soundOn ? '0' : '1'); } catch { /* ignore */ }
+  syncSound();
+});
+// Audio can only start from a user gesture; start() is idempotent.
+const startAudio = () => { if (soundOn) ambience.start(); };
+document.getElementById('btn-enter')?.addEventListener('click', startAudio);
+addEventListener('pointerdown', startAudio);
 
 // ---- Real glTF furniture models ------------------------------------------
 // Light models are preloaded; heavy ones (lantern, ~9 MB) load on first add.

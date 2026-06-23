@@ -79,6 +79,16 @@ body.locked #crosshair, body.aiming #crosshair { opacity: 1; }
 }
 #btn-help:hover { background: rgba(255, 255, 255, 0.12); }
 
+/* ---- Sound toggle ------------------------------------------------------ */
+#btn-sound {
+  position: fixed; left: 16px; top: 196px; z-index: 8;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(10, 14, 20, 0.72); color: var(--text);
+  border: 1px solid var(--panel-border);
+  font-size: 15px; cursor: pointer;
+}
+#btn-sound:hover { background: rgba(255, 255, 255, 0.12); }
+
 /* ---- QR share modal ---------------------------------------------------- */
 #qr-modal {
   position: fixed; inset: 0; z-index: 22;
@@ -293,6 +303,7 @@ section.folded .slider { display: none; }
   #panel.open ~ #panel-fab { display: none; }
   #overlay .card { padding: 24px 20px; }
   #btn-help { top: 130px; }
+  #btn-sound { top: 174px; }
 }
 /* Landscape phones (short height): keep the panel from filling the screen. */
 @media (max-height: 480px) {
